@@ -37,55 +37,57 @@ import scipy as sp
 # We need to define functions for each section, so that when we combine them all, it's less of a stress on the system,
 # and is more readable for readers.
 
+#TODO: Implement other methods to load sat data, helper functions for sph. coordinates. 
 class State:
-    # R: Position vector 
-    # V: Velocity Vector
-    # t: Initial time
+    # R: Position vector [km]
+    # V: Velocity Vector [km/s]
+    # t: Initial time [s]
     def __init__(self, r, v, t):
         self.state = np.concatenate((r, v))
         self.t = t
-        
+    # Helper Function to return position vector
     def r(self):
         return self.state[:3]
-
+     # Helper Function to return velocity vector
     def v(self):
         return self.state[3:]
     
-    def set_r(self, r):
-        self.state[:3] = r
-        
-    def set_v(self, v):
-        self.state[3:] = v
-    
     # Simple Euler Method Integration
-    # TODO: RK4 or similar method
-    def update(self, acceleration, dt):
+    # TODO: RK4 or similar method, might be nice to move acceleration call directly into this update
+    # Takes an old state and new acceleration vector, returns new updated state after Euler Method step
+    def state_update(self, acceleration, dt):
         r = self.r()
         v = self.v()
         
         r_new = r + v*dt
         v_new = v + acceleration*dt
         
-        self.set_r(r_new)
-        self.set_v(v_new)
-        return np.concatenate((r_new, v_new))
+        # Not modifying state in place, but returning new state
+        # Should make it easier to save state data and plot path over time
+        #self.set_r(r_new)
+        #self.set_v(v_new)
+        
+        return State(r_new, v_new, self.t + dt)
         
     
     
 def acceleration_g(state):
     # TODO: Add Higher order harmonics, make into own file
+    # Calculates acceleration due to gravity assuming point mass Earth
     mu = 398600.4418
     r = state.r()
     r_norm = np.linalg.norm(r)
     return -mu*r/(r_norm**3)
 
 # Takes Initial state and numerically integrates with time step dt n times
-def integrate(state_initial, dt, t):
+def integrate(old_state, dt, t):
     # TODO: Implement a better integration method, Add Drag/ Other perturbations
     n = int(t/dt)
     for i in range(n):
-        a = acceleration_g(state_initial)
-        state_initial.update(a, dt)
+        a = acceleration_g(old_state)
+        new_state = old_state.state_update(a, dt)
+        old_state = new_state
+    return new_state
 
 def main():
     print("Hello World 2!")
@@ -97,9 +99,9 @@ def main():
     
     print("Start position: ", Sat1.r())
     
-    integrate(Sat1, 0.01, 3150)
+    Satfinal = integrate(Sat1, 0.01, T * 15)
     
-    print("End Position: ", Sat1.r())
+    print("End Position: ", Satfinal.r())
     
     
     
