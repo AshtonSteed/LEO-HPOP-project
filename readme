@@ -55,3 +55,34 @@ We want to predict the position of the object after t seconds
 
 
 } ~May
+
+
+def update(self, dt):
+        r = self.r()
+        v = self.v()
+
+        k1_r = v
+        k1_v = acceleration_g(r)
+
+        k2_r = v + (0.5 * dt * k1_v)
+        k2_v = acceleration_g(r + (0.5 * dt * k1_r))
+
+        k3_r = v + (0.5 * dt * k2_v)
+        k3_v = acceleration_g(r + (0.5 * dt * k2_r))
+
+        k4_r = v + (dt * k3_v)
+        k4_v = acceleration_g(r + (dt * k3_r))
+
+        r_new = r + v*dt
+        v_new = v + *dt
+
+        self.set_r(r_new)
+        self.set_v(v_new)
+        return np.concatenate((r_new, v_new))
+
+
+
+def acceleration_g(r):
+    # TODO: Add Higher order harmonics, make into own file
+    mu = 398600.4418
+    r_norm = np.linalg.norm(r)
