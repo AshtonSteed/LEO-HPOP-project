@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import scipy as sp
+import butchertableau as bt
 
 # U = -(G*M_earth)/r) + {a}
 #    sum(N_z)(n=2)[(J_n*P_n^0*sin(theta))/(r^(n+1)] + {b}
@@ -28,12 +29,16 @@ import scipy as sp
 
 # TODO: Implement other methods to load sat data, helper functions for sph. coordinates. Might be reasonable to make State as a large array rather than little objects, not sure
 class State:
+    state_list = []
     # R: Position vector [km]
     # V: Velocity Vector [km/s]
     # t: Initial time [s]
     def __init__(self, r, v, t):
         self.state = np.concatenate((r, v))
         self.t = t
+        self.state_list.append(self.state)
+
+    # Makes an arrayList of states, we can use this to get the most recent state (such as state_list[-1])
 
     # Helper Function to return position vector
     def r(self):
@@ -43,29 +48,58 @@ class State:
     def v(self):
         return self.state[3:]
 
-    # RK4 Runge-Kutta 4
+    # RK4
     # TODO: Add even higher order integration, RK8??, might be nice to move acceleration call directly into this update
     # TODO: Change acceleration to be a function of the state, add other pertubations to acceleration()
     def state_update(self, dt):
-        r = self.r()
-        v = self.v()
+        initial_state = self.last_state()
+        x = bt.butcher(8, 0)
+        A, B, C = x.radau()
+        r = initial_state.r()
+        v = initial_state.v()
 
         k1_r = v
         k1_v = acceleration_g(r)
 
-        k2_r = v + (0.5 * dt * k1_v)
-        k2_v = acceleration_g(r + (0.5 * dt * k1_r))
+        k2_r = v + ((4/27) * dt * k1_v)
+        k2_v = acceleration_g(r + (4/27 * dt * k1_r))
 
-        k3_r = v + (0.5 * dt * k2_v)
-        k3_v = acceleration_g(r + (0.5 * dt * k2_r))
+        k3_r = v + ((2/9) * dt * k2_v)
+        k3_v = acceleration_g(r + ((2/9) * dt * k2_r))
 
-        k4_r = v + (dt * k3_v)
-        k4_v = acceleration_g(r + (dt * k3_r))
+        k4_r = v + ((1/3) * dt * k3_v)
+        k4_v = acceleration_g(r + ((1/3) * dt * k3_r))
+
+        k5_r = v + ((1/2) * dt * k4_v)
+        k5_v = acceleration_g(r + ((1/2) * dt * k4_r))
+
+        k6_r = v + ((2/3) * dt * k5_v)
+        k6_v = acceleration_g(r + ((2/3) * dt * k5_r))
+
+        k7_r = v + ((1/6) * dt * k6_v)
+        k7_v = acceleration_g(r + ((1/6) * dt * k6_r))
+
+        k8_r = v + ((2/3) * dt * k7_v)
+
 
         r_new = r + (dt/6) * (k1_r + 2*k2_r + 2*k3_r + k4_r)
         v_new = v + (dt/6) * (k1_v + 2*k2_v + 2*k3_v + k4_v)
 
-        return State(r_new, v_new, self.t + dt)
+        return self.state_list.append(State(r_new, v_new, self.t + dt))
+
+    #k_1 = func(t, y);
+    #k_2 = func(t + h * (4 / 27), y + (h * 4 / 27) * k_1);
+    #k_3 = func(t + h * (2 / 9), y + (h / 18) * (k_1 + 3 * k_2));
+    #k_4 = func(t + h * (1 / 3), y + (h / 12) * (k_1 + 3 * k_3));
+    #k_5 = func(t + h * (1 / 2), y + (h / 8) * (k_1 + 3 * k_4));
+    #k_6 = func(t + h * (2 / 3), y + (h / 54) * (13 * k_1 - 27 * k_3 + 42 * k_4 + 8 * k_5));
+    #k_7 = func(t + h * (1 / 6), y + (h / 4320) * (389 * k_1 - 54 * k_3 + 966 * k_4 - 824 * k_5 + 243 * k_6));
+    #k_8 = func(t + h, y + (h / 20) * (-234 * k_1 + 81 * k_3 - 1164 * k_4 + 656 * k_5 - 122 * k_6 + 800 * k_7));
+    #k_9 = func(t + h * (5 / 6),
+    #           y + (h / 288) * (-127 * k_1 + 18 * k_3 - 678 * k_4 + 456 * k_5 - 9 * k_6 + 576 * k_7 + 4 * k_8));
+    #k_10 = func(t + h, y + (h / 820) * (
+    #            1481 * k_1 - 81 * k_3 + 7104 * k_4 - 3376 * k_5 + 72 * k_6 - 5040 * k_7 - 60 * k_8 + 720 * k_9));
+    #y = y + h / 840 * (41 * k_1 + 27 * k_4 + 272 * k_5 + 27 * k_6 + 216 * k_7 + 216 * k_9 + 41 * k_10);
 
 def acceleration_g(r):
     # TODO: Add Higher order harmonics, make into own file
