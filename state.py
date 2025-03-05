@@ -83,6 +83,13 @@ class State:
         k7_v = acceleration_g(r + ((1/6) * dt * k6_r))
 
         k8_r = v + ((2/3) * dt * k7_v)
+        k8_v = acceleration_g(r + ((2/3) * dt * k7_r))
+
+        k9_r = v + ((5/6) * dt * k8_v)
+        k9_v = acceleration_g(r + ((5/6) * dt * k8_r))
+
+        k10_r = v + (dt * k9_v)
+        k10_v = acceleration_g(r + (dt * k9_r))
 
 
         r_new = r + (dt/6) * (k1_r + 2*k2_r + 2*k3_r + k4_r)
