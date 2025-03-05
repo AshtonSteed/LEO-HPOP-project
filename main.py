@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import scipy as sp
+import matplotlib.pyplot as plt
 
 
 
@@ -47,10 +48,10 @@ class State:
         self.t = t
     # Helper Function to return position vector
     def r(self):
-        return self.state[:3]
+        return self.state[:3] 
      # Helper Function to return velocity vector
     def v(self):
-        return self.state[3:]
+        return self.state[3:] 
     
     # Simple Euler Method Integration
     # TODO: RK4 or similar method, might be nice to move acceleration call directly into this update
@@ -92,17 +93,25 @@ def integrate(old_state, dt, t):
 
 def main():
     print("Hello World 2!")
-    r = np.array([1000, 0, 0])
-    v = np.array([0, 19.96666, 0])
+    r = np.array([6878.0, 0, 0]) #500km Circular Orbit
+    v = np.array([0, 7.61268, 0])
     Sat1 = State(r, v, 0)
-    T = 314.7104915
+    T = 94.61 * 60 # seconds
+    dt = 1 # seconds
     ###
     
     print("Start position: ", Sat1.r())
     
-    Satfinal = integrate(Sat1, 0.01, T * 15)
+    Satfinal = integrate(Sat1, dt, T*10)
     
     print("End Position: ", Satfinal.r())
+    
+   
+    
+    
+    
+    
+    
     
     
     

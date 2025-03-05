@@ -23,7 +23,7 @@ import scipy as sp
 # We need to declare all the variables needed in the equations - by applying those variables to parts of
 # the numpy array:
 
-# We need to define functions for each section, so that when we combine them all, it's less of a stress on the system,
+# We need to define functions for each ssection, so that when we combine them all, it's less of a stress on the system,
 # and is more readable for readers.
 
 # TODO: Implement other methods to load sat data, helper functions for sph. coordinates. Might be reasonable to make State as a large array rather than little objects, not sure
@@ -43,7 +43,7 @@ class State:
     def v(self):
         return self.state[3:]
 
-    # RK4
+    # RK4 Runge-Kutta 4
     # TODO: Add even higher order integration, RK8??, might be nice to move acceleration call directly into this update
     # TODO: Change acceleration to be a function of the state, add other pertubations to acceleration()
     def state_update(self, dt):
@@ -86,15 +86,16 @@ def integrate(old_state, dt, t):
 
 def main():
     print("Hello World 2!")
-    r = np.array([1000, 0, 0])
-    v = np.array([0, 19.96, 0])
+    r = np.array([6878.0, 0, 0])
+    v = np.array([0, 7.61268, 0])
     Sat1 = State(r, v, 0)
-    T = 314.7
+    T = 94.61 * 60
+    dt = 1 #seconds
     ###
 
     print("Start position: ", Sat1.r())
 
-    Satfinal = integrate(Sat1, 0.5, T * 15)
+    Satfinal = integrate(Sat1, dt, T * 30 )
 
     print("End Position: ", Satfinal.r())
 
