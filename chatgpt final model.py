@@ -1,4 +1,5 @@
 import numpy as np
+import butchertableau as bt
 
 # Constants
 G = 6.67430e-20  # km^3/kg/s^2
@@ -89,5 +90,11 @@ def rk8_step(r, v, dt, t_days):
     v_new = v + dt * sum(B[i] * k_v[i] for i in range(13))
 
     return r_new, v_new
+
+def main():
+    print('hi')
+
+if __name__ == "__main__":
+    main()
 
 # Example simulation (same setup as before)
