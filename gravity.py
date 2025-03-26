@@ -70,56 +70,64 @@ class Gravity:
         
         return self.harmonics[index]  
     
-    def potential(self, r, theta, phi, nmax=200,mmax=200,relerror=0E-2):
-        '''
-        Function to find the potential at a given (r, Theta, Phi) in Earth-fixed coordinates
-        Inputs:
-        (r, theta, phi) -> Distance from CoM [km] , Noth Polar Angle [0-pi], Angle from Prime Meridian [0-2pi]
-        nmax, mmax -> max order of terms considered
-        error -> Max relative error acceptable. If 0, use only nmax, mmax
-        Outputs:
-        (Potential energy at point [km^2 s^-2 or MJ/kg], max_order, number of terms)
-        '''
-        
-        rnorm=self.r/r #normalize r with respect to reference radius
-        
-        legendre = sp.special.sph_legendre_p_all(nmax,mmax,theta)[0] # Calculate all normalized spherical legendre polynomials up to nmax, mmax
-        # ^ looks like P(cos(theta)), indexed as legendre[n,m]
-        # output of sph_legendre_p_all is soemthing like [i, n+1, 2 *m+1]
-        # i specifies derivative order, see scipy docs, but the [0] only returns the normal value
-        
-        
-        oldun = 0 # Previous approximation up to last n
-        newu = 1  #start normalized potential at 1
-        
-        n = 2 #starting values for N, M
-        m=0
+    def potential(self, r, theta, phi, nmax=200, mmax=200, relerror=0E-2):
+        """
+        Calculate the gravitational potential at a given point in Earth-fixed coordinates.
 
-        i = 0 #simple counter variable for indexing 
-        
-        
-       
-        # while iterative error is greater than accepted and n is below limits
-        while not(m==0 and abs(newu - oldun) <= relerror * newu) and n<=nmax:
-            #print(abs(newu-oldu)/newu)
-            if m==0:
-                oldun = newu # set old approxiation to current best up to (n,m=n)
-            
-            #Add next term, (R/r)^n * P(cos(theta))* (C cos(mphi) + S sin(mphi))
-            newu += rnorm**n * legendre[n,m] * (self.harmonics[i, 0] * np.cos(m * phi) + self.harmonics[i, 1] * np.sin(m*phi))
+        Parameters:
+        r (float): Distance from the center of mass (CoM) in kilometers.
+        theta (float): North polar angle in radians (0 to pi).
+        phi (float): Angle from the prime meridian in radians (0 to 2*pi).
+        nmax (int): Maximum order of terms to consider in the summation.
+        mmax (int): Maximum degree of terms to consider in the summation.
+        relerror (float): Maximum relative error acceptable. If 0, only nmax and mmax are used.
 
-            #Index terms appropriately
-            i+=1
+        Returns:
+        tuple: A tuple containing:
+            - Potential energy at the point in km^2/s^2 or MJ/kg.
+            - Maximum order of terms considered.
+            - Estimated percentage error of the approximation.
+        """
+        
+        # Normalize the distance with respect to the reference radius
+        rnorm = self.r / r
+        
+        # Calculate all normalized spherical Legendre polynomials up to nmax and mmax
+        legendre = sp.special.sph_legendre_p_all(nmax, mmax, theta)[0]
+        # legendre[n, m] represents P(cos(theta)), where n is the order and m is the degree
+        
+        # Initialize previous and current approximations of the potential
+        oldun = 0  # Previous approximation up to the last n
+        newu = 1   # Start normalized potential at 1
+        
+        # Initialize indices for the summation
+        n = 2  # Starting order
+        m = 0  # Starting degree
+        i = 0  # Index for accessing harmonics
+        
+        # Iterate until the relative error is within the acceptable limit or n reaches nmax
+        while not (m == 0 and abs(newu - oldun) <= relerror * newu) and n <= nmax:
+            # Update the previous approximation when m is 0
+            if m == 0:
+                oldun = newu
             
-            #sneaky bool code, if statements are slow
-            m_increment = (m<n) and m<mmax # bool flag controlling whether to increment m or n, 0 or 1
-            m = (m+m_increment) * (1- (not m_increment)) # add 1 to m or set it to 0
-            n += (not m_increment) # Increment n only if n=m or m=mmax
+            # Add the next term to the potential
+            newu += rnorm**n * legendre[n, m] * (self.harmonics[i, 0] * np.cos(m * phi) + self.harmonics[i, 1] * np.sin(m * phi))
             
+            # Increment the index for harmonics
+            i += 1
+            
+            # Determine whether to increment m or n
+            m_increment = (m < n) and m < mmax  # Boolean flag to control incrementing m or n
+            m = (m + m_increment) * (1 - (not m_increment))  # Increment m or reset to 0
+            n += (not m_increment)  # Increment n only if m reaches n or mmax
+        
+        # Return the potential energy, maximum order, and estimated percentage error
+        return (-self.mu / r * newu, n - 1, 100 * abs(newu - oldun) / newu)
+           
             
         
-        return (-self.mu / r * newu, n-1, 100 * abs(newu - oldun)/newu) # return (value, max order , Estimated % error)
-            
+      
     
 if __name__ == '__main__':
     ag = Gravity()
