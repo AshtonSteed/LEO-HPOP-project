@@ -72,7 +72,7 @@ class Gravity:
     
     def potential(self, r, theta, phi, nmax=200, mmax=200, relerror=0E-2):
         """
-        Calculate the gravitational potential at a given point in Earth-fixed coordinates.
+        Calculate the gravitational potential at a given point in Earth-fixed coordinates
 
         Parameters:
         r (float): Distance from the center of mass (CoM) in kilometers.
@@ -124,8 +124,75 @@ class Gravity:
         
         # Return the potential energy, maximum order, and estimated percentage error
         return (-self.mu / r * newu, n - 1, 100 * abs(newu - oldun) / newu)
-           
-            
+    def ellipsoid_distance(self, lat_rad, h, ao=6378.1370, f=1/298.257223563):
+        """
+        Helper function to converts geodetic point coordinates (latitude, longitude, height) to
+        geocentric radius of point on WGS84 ellipsoid. 
+
+        Args:
+            lat_deg: Geodetic latitude in radians.
+            h: Height above the ellipsoid in kilometers.
+            ao: Equatorial Radius of the ellipsoid (default: WGS84)
+            f: Flattening of the ellipsoid (default: WGS84).
+
+        Returns:
+            The distance r from the centroid
+        """
+       
+        a = ao + h
+        b = a * (1 - f)
+        c = np.cos(lat_rad)
+        s= np.sin(lat_rad)
+        
+        r = np.sqrt(((a**2*c)**2+(b**2*s)**2)/((a*c)**2 + (b*s)**2))
+
+        return r
+    def plot_potential(self, altitude,nmax=10, num_points=200): # Increased num_points for better resolution
+        """
+        Plot the gravitational potential anomaly with respect to J2 on a map at a specified altitude.
+        """
+        latitude = np.linspace(-np.pi/2, np.pi/2, num_points)
+        longitude = np.linspace(-np.pi, np.pi, num_points)
+        lon_grid, lat_grid = np.meshgrid(longitude, latitude)
+
+        # Convert latitude to colatitude (theta)
+        theta_grid = np.pi/2 - lat_grid  # theta = pi/2 - latitude
+        phi_grid = lon_grid  # longitude = phi
+
+        r = self.r + altitude
+
+        # Calculate potential on the grid
+        potential_grid = np.zeros_like(lat_grid)
+        potential_rid = np.zeros_like(lat_grid)
+        for i in range(num_points):
+            for j in range(num_points):
+                potential_grid[i, j] = self.potential(r, theta_grid[i, j], phi_grid[i, j], nmax=nmax)[0]
+                potential_rid[i,j] =self.potential(r, theta_grid[i, j], phi_grid[i, j], nmax=2)[0]
+                #potential_rid[i,j] =self.potential(r, theta_grid[i, j], phi_grid[i, j], nmax=0)[0]
+
+
+        # Plotting
+        fig, ax = plt.subplots(figsize=(10, 10), subplot_kw={'projection': 'aitoff'})
+
+        # Create a filled mesh plot
+        im = ax.pcolormesh(lon_grid, lat_grid, potential_grid-potential_rid, cmap='viridis') # Adjust levels as needed
+
+        # Add a colorbar
+        fig.colorbar(im, ax=ax, label='Gravitational Potential Anomaly J{}-J2 (km^2/s^2)'.format(nmax))
+
+        # Daytona Beach coordinates
+        lat_daytona = np.radians(29.218103)
+        lon_daytona = np.radians(-81.031723)
+
+        # Plot Daytona Beach point
+        ax.scatter(lon_daytona, lat_daytona, color='red', s=100, label='Daytona Beach')
+
+        ax.set_xlabel('Longitude (rad)')
+        ax.set_ylabel('Latitude (rad)')
+        ax.set_title('Gravitational Potential Anomaly Map at {} km Altitude'.format(altitude))
+        ax.grid(True)
+        
+        plt.show()
         
       
     
@@ -137,63 +204,12 @@ if __name__ == '__main__':
     
     r = ag.r
     ref = -ag.mu / r
-    
+    theta_daytona = np.radians(90-29.218103)
+    phi_daytona = np.radians(-81.031723)
     
     theta = np.linspace(0,np.pi, 100)
-    phi = np.radians(-81.031723)
-    vec_func = np.vectorize(ag.potential)
-    ref1 = vec_func(r, theta, phi, nmax=150)[0]
-    ref2 = vec_func(r, theta, phi+np.pi, nmax=150)[0]
-    
-    u1 = vec_func(r, theta, phi, nmax=2)[0]
-    u2 = vec_func(r, theta, phi+np.pi, nmax=2)[0]
-    
-    u3 = vec_func(r, theta, phi, nmax=4)[0]
-    u4 = vec_func(r, theta, phi+np.pi, nmax=4)[0]
-    
-    u5 = vec_func(r, theta, phi, nmax=10)[0]
-    u6 = vec_func(r, theta, phi+np.pi, nmax=10)[0]
-    
-    u7 = vec_func(r, theta, phi, nmax=50)[0]
-    u8 = vec_func(r, theta, phi+np.pi, nmax=50)[0]
     
     
+    ag.plot_potential(50, nmax=10)
     
-   
-    # Create the polar plot
-    fig, ax = plt.subplots(subplot_kw={'projection': 'polar'})  # Create a polar subplot
-    
-    plt.plot(np.radians(90-29.218103), 0, marker='o', markersize=10, color='black', label='Daytona Beach')  # Add the marker
-    
-    ax.plot(theta, np.zeros_like(theta),color='grey',linestyle='-', label='Reference [n=m=150]')  # Plot theta vs. potential
-    ax.plot(-theta, np.zeros_like(theta), color='grey',linestyle='-')  # Plot theta vs. potential
-    
-    ax.plot(theta, np.arcsinh(ref-ref1),color='green', label='Point Mass')  # Plot theta vs. potential
-    ax.plot(-theta, np.arcsinh(ref-ref2), color='green')  # Plot theta vs. potential
-    
-    ax.plot(theta, np.arcsinh(u1-ref1),color='blue', label='J2')  # Plot theta vs. potential
-    ax.plot(-theta, np.arcsinh(u2-ref2), color='blue')  # Plot theta vs. potential
-    
-    
-    
-    ax.plot(theta, np.arcsinh(u3-ref1),color='red', label='J4')  # Plot theta vs. potential
-    ax.plot(-theta, np.arcsinh(u4-ref2), color='red')  # Plot theta vs. potential
-    
-    ax.plot(theta, np.arcsinh(u5-ref1),color='orange', label='N=10')  # Plot theta vs. potential
-    ax.plot(-theta, np.arcsinh(u6-ref2), color='orange')  # Plot theta vs. potential
-    
-    ax.plot(theta, np.arcsinh(u7-ref1),color='magenta', label='N=50')  # Plot theta vs. potential
-    ax.plot(-theta, np.arcsinh(u8-ref2), color='magenta')  # Plot theta vs. potential
-    
-    
-    
-    
-    ax.set_theta_direction(-1)  # Ensure theta increases counterclockwise
-    ax.set_theta_offset(np.pi / 2)  # Start theta at the top (North Pole)
-    ax.set_title(f"asin(Geopotential error) vs. Colatitude (r={r}, phi={np.degrees(phi):.2f} deg)")
-    ax.set_xlabel("Colatitude (radians)")
-    ax.set_ylabel("asin(Geopotential error)")
-    ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-    plt.subplots_adjust(right=0.75)
-    plt.show()
-    
+
