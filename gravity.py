@@ -193,8 +193,8 @@ class Gravity:
         ax.grid(True)
         
         plt.show()
-        
-      
+    #TODO make a function that returns a vector [ar, atheta, aphi] in Fixed Geocentric coordinates.  
+
     
 if __name__ == '__main__':
     ag = Gravity()

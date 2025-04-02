@@ -40,8 +40,8 @@ import matplotlib.pyplot as plt
 
 #TODO: Implement other methods to load sat data, helper functions for sph. coordinates. 
 class State:
-    # R: Position vector [km]
-    # V: Velocity Vector [km/s]
+    # R: Position vector [km] ECI
+    # V: Velocity Vector [km/s] ECI
     # t: Initial time [s]
     def __init__(self, r, v, t):
         self.state = np.concatenate((r, v))
@@ -69,7 +69,9 @@ class State:
         #self.set_v(v_new)
         
         return State(r_new, v_new, self.t + dt)
-        
+    
+    #TODO: Conversion functions between ECEF and Geodetic Coordinates, (Quan & Zeng, 2024)
+    #TODO: Also tack on conversion between ECEF and ECI using epoc of choice (J2000?)
 
     
 def acceleration_g(state):
