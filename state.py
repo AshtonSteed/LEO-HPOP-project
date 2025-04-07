@@ -24,7 +24,7 @@ import butchertableau as bt
 # We need to declare all the variables needed in the equations - by applying those variables to parts of
 # the numpy array:
 
-# We need to define functions for each ssection, so that when we combine them all, it's less of a stress on the system,
+# We need to define functions for each section, so that when we combine them all, it's less of a stress on the system,
 # and is more readable for readers.
 
 # TODO: Implement other methods to load sat data, helper functions for sph. coordinates. Might be reasonable to make State as a large array rather than little objects, not sure
@@ -131,3 +131,33 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# Geodetic to ECEF
+# Uses latitude, longitude, and altitude as input for calculations, outputs XYZ
+# N represents ellipsoid radius of curvature in the prime vertical plane
+# Function converts Geodetic (latitude, longitude, altitude) coordinates into Earth Centered Earth Fixed (ECEF) coordinates, or x,y,z
+# Jarrett Usui the awesome
+# To do: Define variable N
+def Convert2ECEF(latitude,longitude,altitude):
+    X = (N + altitude)*np.cos(longitude)*np.cos(latitude)
+    Y = (N + altitude)*np.cos(longitude)*np.sin(latitude)
+    Z = (N*(1-e**2)+altitude)*np.sin(longitude)
+    return (X,Y,Z)
+
+# ECEF to Geodetic
+# Uses XYZ coordinates as input for calculations, and outputs latitude, longitude, and altitude.
+# a is the semi major axis, e is the first eccentricity of the ellipsoid, 
+# x is auxillary variable and W is the hypotenuse of X and Y
+# Function converts Cartesian ECEF coords (X,Y,Z) into Geodetic (latitude, longitude, altitude)
+# Jarrett Usui
+# To do: Define variables W,x,a, and e
+def Convert2Geodetic(X,Y,Z):
+    latitude = 2*np.arctan(Z/((W-x)+np.sqrt(Z**2+(W-x)**2)))
+    if Y>=0:
+        longitude = np.pi/2-2*np.arctan(X/(np.sqrt(X**2+Y**2)-Y))
+    else:
+        longitude = 2*np.arctan(X/(np.sqrt(X**2+Y**2)-Y)-np.pi/2)
+    altitude = W*np.cos(latitude)+Z*np.sin(latitude)-a*np.sqrt(1-e**2*np.sin**2(latitude))
+    return (latitude,longitude,altitude)
+    
+    
