@@ -137,8 +137,9 @@ if __name__ == "__main__":
 # N represents ellipsoid radius of curvature in the prime vertical plane
 # Function converts Geodetic (latitude, longitude, altitude) coordinates into Earth Centered Earth Fixed (ECEF) coordinates, or x,y,z
 # Jarrett Usui the awesome
-# To do: Define variable N
+# To do: Define variable a
 def Convert2ECEF(latitude,longitude,altitude):
+    N = a/(sqrt(1-e**2*sin**2(longitude))
     X = (N + altitude)*np.cos(longitude)*np.cos(latitude)
     Y = (N + altitude)*np.cos(longitude)*np.sin(latitude)
     Z = (N*(1-e**2)+altitude)*np.sin(longitude)
@@ -150,14 +151,19 @@ def Convert2ECEF(latitude,longitude,altitude):
 # x is auxillary variable and W is the hypotenuse of X and Y
 # Function converts Cartesian ECEF coords (X,Y,Z) into Geodetic (latitude, longitude, altitude)
 # Jarrett Usui
-# To do: Define variables W,x,a, and e
+# To do: Define variables S,theta,a
 def Convert2Geodetic(X,Y,Z):
-    latitude = 2*np.arctan(Z/((W-x)+np.sqrt(Z**2+(W-x)**2)))
-    if Y>=0:
-        longitude = np.pi/2-2*np.arctan(X/(np.sqrt(X**2+Y**2)-Y))
-    else:
-        longitude = 2*np.arctan(X/(np.sqrt(X**2+Y**2)-Y)-np.pi/2)
-    altitude = W*np.cos(latitude)+Z*np.sin(latitude)-a*np.sqrt(1-e**2*np.sin**2(latitude))
+    W = sqrt(Y**2+Z**2)
+    k = (W-x)/W
+    m = W**2
+    # theta = ??? 
+    x = a*e**2*np.cos(theta)
+    I = W-x
+    n = Z**2
+    S = sqrt(I**2+n)
+    latitude = 2*np.arctan(Z/(I+S))
+    longitude = np.sign(Y)*(np.pi/2-2*np.arctan(X/(W+abs(Y)))
+    altitude = -1*sqrt(1-e**2)*sqrt(a**2-m/e**2)
     return (latitude,longitude,altitude)
     
     
