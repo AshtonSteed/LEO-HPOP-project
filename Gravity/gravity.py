@@ -22,7 +22,7 @@ class Gravity:
 
         """
 
-        filepath = os.path.join("data", filename)  # Construct full path, os independent
+        filepath = os.path.join("../data", filename)  # Construct full path, os independent
         # Custom converter to handle werid 'D' notation, otherwise numpy gets mad
         def d_to_e(s):
             try:
