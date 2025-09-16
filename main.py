@@ -1,42 +1,9 @@
 import numpy as np
 import pandas as pd
-import scipy as sp
+import scipy as sp 
 import matplotlib.pyplot as plt
+from gravity import Gravity
 
-
-
-
-# U = -(G*M_earth)/r) + {a}
-#    sum(N_z)(n=2)[(J_n*P_n^0*sin(theta))/(r^(n+1)] + {b}
-#    sum(N_t)(n=2)[sum(n)(m=1)[(P_n^m*sin(theta)*(C_n^m*cos(m*phi)+S_n^m*sin(m*phi)))/(r^(n+1))] {c,d}
-
-
-# Before you begin typing ANY code, you MUST write a comment of what you are intending to do with the function.
-# An example would be:
-# Name of Function
-# Arguments / variables used, and what they mean
-# What the intention of the function is
-
-# Make it easier for the computer and you to figure out what to do with the data.
-# Another important thing is to use the libraries given. numpy has all the functions you need for individual data;
-# redundancies just take up more space and are less efficient.
-
-
-# We need to initialize the numpy array.
-# We don't have the file that we are getting the data from, but preferably we can export it as a csv.
-#leo_data = pd.read_csv('~~.csv', ',')
-
-
-# We need to declare all the variables needed in the equations - by applying those variables to parts of
-# the numpy array:
-
-
-
-
-
-
-# We need to define functions for each section, so that when we combine them all, it's less of a stress on the system,
-# and is more readable for readers.
 
 #TODO: Implement other methods to load sat data, helper functions for sph. coordinates. 
 class State:
@@ -44,80 +11,142 @@ class State:
     # V: Velocity Vector [km/s] ECI
     # t: Initial time [s]
     def __init__(self, r, v, t):
+        # The state vector for solve_ivp is [rx, ry, rz, vx, vy, vz]
         self.state = np.concatenate((r, v))
         self.t = t
-    # Helper Function to return position vector
+
+    # Helper Function to return position vector from the state array
     def r(self):
-        return self.state[:3] 
-     # Helper Function to return velocity vector
+        return self.state[:3]
+
+    # Helper Function to return velocity vector from the state array
     def v(self):
-        return self.state[3:] 
-    
-    # Simple Euler Method Integration
-    # TODO: RK4 or similar method, might be nice to move acceleration call directly into this update
-    # Takes an old state and new acceleration vector, returns new updated state after Euler Method step
-    def state_update(self, acceleration, dt):
-        r = self.r()
-        v = self.v()
-        
-        r_new = r + v*dt
-        v_new = v + acceleration*dt
-        
-        # Not modifying state in place, but returning new state
-        # Should make it easier to save state data and plot path over time
-        #self.set_r(r_new)
-        #self.set_v(v_new)
-        
-        return State(r_new, v_new, self.t + dt)
-    
-    #TODO: Conversion functions between ECEF and Geodetic Coordinates, (Quan & Zeng, 2024)
-    #TODO: Also tack on conversion between ECEF and ECI using epoc of choice (J2000?)
+        return self.state[3:]
+
 
     
-def acceleration_g(state):
-    # TODO: Add Higher order harmonics, make into own file
-    # Calculates acceleration due to gravity assuming point mass Earth
-    mu = 398600.4418
-    r = state.r()
+# Name of Function: acceleration_g
+# Arguments / variables used:
+#   - t: Current time (unused, but required by solve_ivp signature)
+#   - state: A numpy array representing the current state vector [rx, ry, rz, vx, vy, vz]
+#   This function serves as the derivative function for scipy.integrate.solve_ivp, returning
+#   the derivatives of the state vector [vx, vy, vz, ax, ay, az].
+def state_update(t, state, g):
+    
+    # Initialize output array for derivatives [vx, vy, vz, ax, ay, az]
+    output = np.zeros_like(state)
+    
+    # Extract position and velocity vectors
+    r = state[:3]
+    v = state[3:]
+
+    # Calculate the norm (magnitude) of the position vector
     r_norm = np.linalg.norm(r)
-    return -mu*r/(r_norm**3)
+    
+    a = -g.mu * r / (r_norm**3) # Point mass earth acceleration
+    
+    # The first three elements of the output are the velocity components (dr/dt = v)
+    output[:3] = v
+    # The last three elements of the output are the acceleration components (dv/dt = a)
+    output[3:] = a
+    
+    return output
 
-# Takes Initial state and numerically integrates with time step dt n times
-def integrate(old_state, dt, t):
-    # TODO: Implement a better integration method, Add Drag/ Other perturbations
-    n = int(t/dt)
-    for i in range(n):
-        a = acceleration_g(old_state)
-        new_state = old_state.state_update(a, dt)
-        old_state = new_state
-    return new_state
+# Name of Function: integrate
+# Arguments / variables used:
+#   - initial_state_vector: A numpy array representing the initial state vector [rx, ry, rz, vx, vy, vz].
+#   - t_span: A tuple (t0, tf) representing the start and end times for the integration.
+#   - dt: The initial step size for the integration.
+# What the intention of the function is:
+#   This function numerically integrates the equations of motion using scipy.integrate.solve_ivp.
+#   It takes an initial state vector and a time span, and returns the results of the integration.
+def integrate(initial_state_vector, t_span, dt, g):
+    
+    # Use scipy.integrate.solve_ivp to perform the numerical integration
+    results = sp.integrate.solve_ivp(state_update, t_span, initial_state_vector, 
+                                     first_step=dt, rtol=1e-9, atol=1e-9, method='DOP853', args=[g])
+    return results
 
 
 def main():
-    print("Hello World 2!")
-    r = np.array([6878.0, 0, 0]) #500km Circular Orbit
-    v = np.array([0, 7.61268, 0])
-    Sat1 = State(r, v, 0)
-    T = 94.61 * 60 # seconds
-    dt = 1 # seconds
-    ###
+    print("Starting orbital simulation...")
     
-    print("Start position: ", Sat1.r())
+    g = Gravity()
     
-    Satfinal = integrate(Sat1, dt, T*10)
-    
-    print("End Position: ", Satfinal.r())
-    
-   
-    
-    
-    
-    
-    
-    
-    
-    
+    # Initial conditions for a 500km circular orbit
+    r_initial = np.array([g.r+500, 0, 0])  # Position vector [km]
+    v_initial = np.array([0, np.sqrt(g.mu/(g.r+500)), 0]) # Velocity vector [km/s]
+    t_initial = 0.0                       # Initial time [s]
 
+    # Create a State object to hold initial conditions
+    initial_satellite_state = State(r_initial, v_initial, t_initial)
+    
+    # Define simulation parameters
+    orbital_period = np.sqrt(4 * np.pi**2 * np.linalg.norm(r_initial)**3 /g.mu) # seconds for one orbit
+    print(orbital_period)
+    simulation_duration = orbital_period * 30 # Simulate for 30 orbits
+    time_step = 1               # Initial step size for the solver [s]
+    
+    # Define the time span for integration (from t_initial to simulation_duration)
+    t_span = (t_initial, simulation_duration)
+    
+    print("Initial position: ", initial_satellite_state.r())
+    print("Initial velocity: ", initial_satellite_state.v())
+    
+    # Integrate the equations of motion
+    # Pass the raw state vector from the State object
+    simulation_results = integrate(initial_satellite_state.state, t_span, time_step,g)
+    
+    print("Simulation completed.")
+    print("Final Position: ", simulation_results.y[:3,-1])
+    print("Number of saved positions: ", len(simulation_results.y[0]))
+    
+    # Plot the orbit
+    plot_orbit(simulation_results, g.r)
+
+
+# Name of Function: plot_orbit
+# Arguments / variables used:
+#   - results: A scipy.integrate.OdeResult object containing the time and state vectors from the integration.
+# What the intention of the function is:
+#   This function takes the results of an orbital integration and plots the 3D trajectory of the satellite.
+#   It extracts the x, y, and z position components over time and visualizes them using matplotlib.
+def plot_orbit(results, r_earth):
+    # Extract position vectors (x, y, z) from the integration results
+    x = results.y[0, :]
+    y = results.y[1, :]
+    z = results.y[2, :]
+
+    fig = plt.figure(figsize=(10, 8))
+    ax = fig.add_subplot(111, projection='3d')
+
+    # Plot the Earth as a sphere
+    
+    u = np.linspace(0, 2 * np.pi, 30)
+    v = np.linspace(0, np.pi, 30)
+    x_sphere = r_earth * np.outer(np.cos(u), np.sin(v))
+    y_sphere = r_earth * np.outer(np.sin(u), np.sin(v))
+    z_sphere = r_earth * np.outer(np.ones(np.size(u)), np.cos(v))
+    ax.plot_surface(x_sphere, y_sphere, z_sphere, color='blue', alpha=0.3, label='Earth')
+
+    ax.plot(x, y, z, label='Satellite Trajectory')
+    ax.scatter(x[0], y[0], z[0], color='green', marker='o', s=50, label='Start Position')
+    ax.scatter(x[-1], y[-1], z[-1], color='red', marker='x', s=50, label='End Position')
+    
+    #Set the aspect of the grid to be similar to data displayed
+    sx = max(np.ptp(x), 2*r_earth)
+    sy = max(np.ptp(y), 2*r_earth)
+    sz = max(np.ptp(z), 2*r_earth)
+    ax.set_box_aspect((sx,sy,sz))
+
+
+    ax.set_xlabel('X Position (km)')
+    ax.set_ylabel('Y Position (km)')
+    ax.set_zlabel('Z Position (km)')
+    ax.set_title('Satellite Orbit Trajectory')
+    ax.legend()
+    ax.grid(True)
+    plt.show()
 
 
 if __name__ == "__main__":
