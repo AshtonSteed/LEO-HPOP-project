@@ -1,7 +1,5 @@
-{
-U = -(G*M_earth)/r) + {a}
-    sum(N_z)(n=2)[(J_n*P_n^0*sin(theta))/(r^(n+1)] + {b}
-    sum(N_t)(n=2)[sum(n)(m=1)[(P_n^m*sin(theta)*(C_n^m*cos(m*phi)+S_n^m*sin(m*phi)))/(r^(n+1))] {c,d}
+![Gravitational Potential](https://latex.codecogs.com/svg.latex?-\frac{GM_{\oplus}}{r}%20+%20\sum_{n=2}^{N_z}%20\frac{J_n%20P_n^{0}(\cos\theta)}{r^{n+1}}%20+%20\sum_{n=2}^{N_t}%20\sum_{m=1}^{n}%20\frac{P_n^{m}(\cos\theta)\,(C_n^m%20\cos(m\phi)%20+%20S_n^m%20\sin(m\phi))}{r^{n+1}})
+
 
 Basically, from what I've read from the wiki page, if I'm getting this right, here's the description
 of each variable, coefficient, each section of the equation, and the process of how we want to proceed:
@@ -54,9 +52,9 @@ x_(t+1)=x_t+x_t*dt
 We want to predict the position of the object after t seconds
 
 
-} ~May
+~May
 
-
+**rk8 - need to update**
 def update(self, dt):
         r = self.r()
         v = self.v()

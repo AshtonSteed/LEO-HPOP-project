@@ -1,11 +1,11 @@
 import numpy as np
-import pandas as pd
-import scipy as sp
 import butchertableau as bt
+
 
 # U = -(G*M_earth)/r) + {a}
 #    sum(N_z)(n=2)[(J_n*P_n^0*sin(theta))/(r^(n+1)] + {b}
-#    sum(N_t)(n=2)[sum(n)(m=1)[(P_n^m*sin(theta)*(C_n^m*cos(m*phi)+S_n^m*sin(m*phi)))/(r^(n+1))] {c,d}
+#    sum(N_t)(n=2)[sum(n)(m=1)[(P_n^m*sin(theta)* {c}
+#                              (C_n^m*cos(m*phi)+S_n^m*sin(m*phi)))/(r^(n+1))]] {d}
 
 # Before you begin typing ANY code, you MUST write a comment of what you are intending to do with the function.
 # An example would be:
@@ -37,6 +37,10 @@ class State:
         self.state = np.concatenate((r, v))
         self.t = t
         self.state_list.append(self.state)
+        self.a = 6378.137 #equatorial radius of the earth, km
+        self.b = 6356.7523142 #polar radius of the earth, km
+        self.am = self.a*1000 #eq radius, m
+        self.bm = self.b*1000 #pol radius, m
 
     # Makes an arrayList of states, we can use this to get the most recent state (such as state_list[-1])
 
@@ -97,73 +101,75 @@ class State:
     #TODO: Conversion functions between ECEF and Geodetic Coordinates, (Quan & Zeng, 2024)
     #TODO: Also tack on conversion between ECEF and ECI using epoc of choice (J2000?)
 
-def acceleration_g(r):
-    # TODO: Add Higher order harmonics, make into own file
-    # Calculates acceleration due to gravity assuming point mass Earth
-    mu = 398600.4418
-    r_norm = np.linalg.norm(r)
-    return -mu * r / (r_norm ** 3)
+    def acceleration_g(r):
+        # TODO: Add Higher order harmonics, make into own file
+        # Calculates acceleration due to gravity assuming point mass Earth
+        mu = 398600.4418
+        r_norm = np.linalg.norm(r)
+        return -mu * r / (r_norm ** 3)
 
-# Takes Initial state and numerically integrates with time step dt n times
-def integrate(old_state, dt, t):
-    # TODO: Implement a better integration method, Add Drag/ Other perturbations
-    n = int(t / dt)
-    current_state = old_state
-    for i in range(n):
-        #a = acceleration_g(current_state.r())
-        current_state = current_state.state_update(dt)
-    return current_state
+    # Takes Initial state and numerically integrates with time step dt n times
+    def integrate(old_state, dt, t):
+        # TODO: Implement a better integration method, Add Drag/ Other perturbations
+        n = int(t / dt)
+        current_state = old_state
+        for i in range(n):
+            #a = acceleration_g(current_state.r())
+            current_state = current_state.state_update(dt)
+        return current_state
 
-def main():
-    print("Hello World 2!")
-    r = np.array([6878.0, 0, 0])
-    v = np.array([0, 7.61268, 0])
-    Sat1 = State(r, v, 0)
-    T = 94.61 * 60
-    dt = 1 #seconds
-    ###
+    def main():
+        print("Hello World 2!")
+        r = np.array([6878.0, 0, 0])
+        v = np.array([0, 7.61268, 0])
+        Sat1 = State(r, v, 0)
+        T = 94.61 * 60
+        dt = 1 #seconds
+        ###
 
-    print("Start position: ", Sat1.r())
+        print("Start position: ", Sat1.r())
 
-    Satfinal = integrate(Sat1, dt, T * 30 )
+        Satfinal = integrate(Sat1, dt, T * 30 )
 
-    print("End Position: ", Satfinal.r())
+        print("End Position: ", Satfinal.r())
 
-if __name__ == "__main__":
-    main()
+    if __name__ == "__main__":
+        main()
 
-# Geodetic to ECEF
-# Uses latitude, longitude, and altitude as input for calculations, outputs XYZ
-# N represents ellipsoid radius of curvature in the prime vertical plane
-# Function converts Geodetic (latitude, longitude, altitude) coordinates into Earth Centered Earth Fixed (ECEF) coordinates, or x,y,z
-# Jarrett Usui the awesome
-# To do: Define variable a
-def Convert2ECEF(latitude,longitude,altitude):
-    N = a/(sqrt(1-e**2*sin**2(longitude))
-    X = (N + altitude)*np.cos(longitude)*np.cos(latitude)
-    Y = (N + altitude)*np.cos(longitude)*np.sin(latitude)
-    Z = (N*(1-e**2)+altitude)*np.sin(longitude)
-    return (X,Y,Z)
+    # From (You 2000), other various sources
 
-# ECEF to Geodetic
-# Uses XYZ coordinates as input for calculations, and outputs latitude, longitude, and altitude.
-# a is the semi major axis, e is the first eccentricity of the ellipsoid, 
-# x is auxillary variable and W is the hypotenuse of X and Y
-# Function converts Cartesian ECEF coords (X,Y,Z) into Geodetic (latitude, longitude, altitude)
-# Jarrett Usui
-# To do: Define variables S,theta,a
-def Convert2Geodetic(X,Y,Z):
-    W = sqrt(Y**2+Z**2)
-    k = (W-x)/W
-    m = W**2
-    # theta = ??? 
-    x = a*e**2*np.cos(theta)
-    I = W-x
-    n = Z**2
-    S = sqrt(I**2+n)
-    latitude = 2*np.arctan(Z/(I+S))
-    longitude = np.sign(Y)*(np.pi/2-2*np.arctan(X/(W+abs(Y)))
-    altitude = -1*sqrt(1-e**2)*sqrt(a**2-m/e**2)
-    return (latitude,longitude,altitude)
-    
-    
+    # Defining N(phi) in the GtECEF conversion
+    # Maybelline Flesher
+    def prime_vertical_radius(self, lat):
+        var1 = self.a**2 * np.cos(lat)**2
+        var2 = self.b**2 * np.sin(lat)**2
+        return self.a**2 / np.sqrt(var1 + var2)
+
+    # Geodetic to ECEF (Earth Centered, Earth Fixed)
+    # Uses latitude, longitude, and altitude as input for calculations, outputs XYZ
+    # N represents ellipsoid radius of curvature in the prime vertical plane
+    # Function converts Geodetic (latitude, longitude, altitude) coordinates into Earth Centered Earth Fixed (ECEF) coordinates, or x,y,z
+    # Jarrett Usui, Maybelline Flesher
+    def geodetic_to_ecef(self, lat, long, alt):
+        n_phi = self.prime_vertical_radius(lat)
+        x_ecef = (n_phi + alt) * np.cos(long) * np.cos(lat)
+        y_ecef = (n_phi + alt) * np.cos(long) * np.sin(lat)
+        z_ecef = ((n_phi * (self.b**2/self.a**2)) + alt)*np.sin(long)
+        return x_ecef, y_ecef, z_ecef
+
+    # ECEF to Geodetic
+    # Uses XYZ coordinates as input for calculations, and outputs latitude, longitude, and altitude.
+    # Uses an application of Ferrari's solution, supposedly (Zhu 1994) is the most accurate, proposed
+    #   by Heikkinen (1984)
+    # I can't find Heikkinen's, but (You 2000) presents the math behind it. We will be using a
+    #   Non-Iterative Method of the Zeroth Order.
+    # Function converts Cartesian ECEF coords (X,Y,Z) into Geodetic (latitude, longitude, altitude)
+    # Jarrett Usui, Maybelline Flesher
+    def Convert2Geodetic(self, x_ecef,y_ecef,z_ecef):
+
+        latitude = 2*np.arctan(Z/(I+S))
+        longitude = np.sign(Y)*(np.pi/2-2*np.arctan(X/(W+abs(Y)))
+        altitude = -1*np.sqrt(1-e**2)*sqrt(a**2-m/e**2)
+        return (latitude,longitude,altitude)
+
+
