@@ -41,6 +41,7 @@ class State:
         self.b = 6356.7523142 #polar radius of the earth, km
         self.am = self.a*1000 #eq radius, m
         self.bm = self.b*1000 #pol radius, m
+        self.eccm_2 = (self.am**2-self.bm**2)/(self.am**2)
 
     # Makes an arrayList of states, we can use this to get the most recent state (such as state_list[-1])
 
@@ -166,7 +167,7 @@ class State:
     # Function converts Cartesian ECEF coords (X,Y,Z) into Geodetic (latitude, longitude, altitude)
     # Jarrett Usui, Maybelline Flesher
     def Convert2Geodetic(self, x_ecef,y_ecef,z_ecef):
-
+        l = (self.a*
         latitude = 2*np.arctan(Z/(I+S))
         longitude = np.sign(Y)*(np.pi/2-2*np.arctan(X/(W+abs(Y)))
         altitude = -1*np.sqrt(1-e**2)*sqrt(a**2-m/e**2)
