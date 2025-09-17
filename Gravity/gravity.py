@@ -3,6 +3,7 @@ import numpy as np
 import os
 import scipy as sp
 import matplotlib.pyplot as plt
+from pathlib import Path
 
 class Gravity:
     def __init__(self):
@@ -10,7 +11,7 @@ class Gravity:
         self.mu = 398600.4415 #km^3 s^-2, From Pavlis et al. 2008
         self.r = 6378.1363 #km, Reference radius from EGM2008
         
-    def load_egm_to_numpy(self,filename="EGM2008NM1000.csv"):
+    def load_egm_to_numpy(self, filename="EGM2008NM1000.csv"):
         """
         Loads EGM data from a whitespace-separated CSV file into a NumPy array.
 
@@ -21,8 +22,12 @@ class Gravity:
             numpy.ndarray: A structured NumPy array with columns [Cnm, Snm] with 64bit floats
 
         """
-
-        filepath = os.path.join("../data", filename)  # Construct full path, os independent
+        current_dir = Path(__file__).resolve().parent
+        project_dir = current_dir.parent
+        filepath = project_dir / 'data' / filename
+        
+        #filepathtemp = os.path.join("../data/", filename)  # Construct full path, os independent
+        #filepath = os.path.normpath(filepathtemp)
         # Custom converter to handle werid 'D' notation, otherwise numpy gets mad
         def d_to_e(s):
             try:

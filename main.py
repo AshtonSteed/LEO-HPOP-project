@@ -10,9 +10,9 @@ class State:
     # R: Position vector [km] ECI
     # V: Velocity Vector [km/s] ECI
     # t: Initial time [s]
-    def __init__(self, r, v, t):
+    def __init__(self, rv, t):
         # The state vector for solve_ivp is [rx, ry, rz, vx, vy, vz]
-        self.state = np.concatenate((r, v))
+        self.state = rv
         self.t = t
 
     # Helper Function to return position vector from the state array
@@ -28,21 +28,23 @@ class State:
 # Name of Function: acceleration_g
 # Arguments / variables used:
 #   - t: Current time (unused, but required by solve_ivp signature)
-#   - state: A numpy array representing the current state vector [rx, ry, rz, vx, vy, vz]
+#   - statevec: A numpy array representing the current state vector [rx, ry, rz, vx, vy, vz]
 #   This function serves as the derivative function for scipy.integrate.solve_ivp, returning
 #   the derivatives of the state vector [vx, vy, vz, ax, ay, az].
-def state_update(t, state, g):
+def state_update(t, statevec, g):
     
     # Initialize output array for derivatives [vx, vy, vz, ax, ay, az]
-    output = np.zeros_like(state)
+    output = np.zeros_like(statevec)
+    
+    # Create a State object for convinience in coordinate conversion and data pulling
+    state = State(statevec, t)
     
     # Extract position and velocity vectors
-    r = state[:3]
-    v = state[3:]
+    r = state.r()
+    v = state.v()
 
     # Calculate the norm (magnitude) of the position vector
     r_norm = np.linalg.norm(r)
-    
     a = -g.mu * r / (r_norm**3) # Point mass earth acceleration
     
     # The first three elements of the output are the velocity components (dr/dt = v)
@@ -79,12 +81,12 @@ def main():
     t_initial = 0.0                       # Initial time [s]
 
     # Create a State object to hold initial conditions
-    initial_satellite_state = State(r_initial, v_initial, t_initial)
+    initial_satellite_state = State(np.concatenate((r_initial, v_initial)), t_initial)
     
     # Define simulation parameters
     orbital_period = np.sqrt(4 * np.pi**2 * np.linalg.norm(r_initial)**3 /g.mu) # seconds for one orbit
     print(orbital_period)
-    simulation_duration = orbital_period * 30 # Simulate for 30 orbits
+    simulation_duration = orbital_period * 10 # Simulate for 30 orbits
     time_step = 1               # Initial step size for the solver [s]
     
     # Define the time span for integration (from t_initial to simulation_duration)
