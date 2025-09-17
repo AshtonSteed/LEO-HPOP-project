@@ -99,8 +99,6 @@ class State:
 
         return self.state_list.append(State(r_new, v_new, self.t + dt))
 
-    #TODO: Conversion functions between ECEF and Geodetic Coordinates, (Quan & Zeng, 2024)
-    #TODO: Also tack on conversion between ECEF and ECI using epoc of choice (J2000?)
 
     def acceleration_g(r):
         # TODO: Add Higher order harmonics, make into own file
@@ -150,6 +148,7 @@ class State:
     # Geodetic to ECEF (Earth Centered, Earth Fixed)
     # Uses latitude (rad), longitude (rad), and altitude (m) as Geodetic coordinates, outputs X, Y, Z (float)
     # N represents ellipsoid radius of curvature in the prime vertical plane
+    # Converts Geodetic coordinates to ECEF coordinates
     # Jarrett Usui, Maybelline Flesher
     def geodetic_to_ecef(self, lat, long, alt):
         n_phi = self.prime_vertical_radius(lat)
@@ -160,7 +159,9 @@ class State:
 
     # ECEF to Geodetic
     # Uses X, Y, Z as ECEF coordinates (float), and outputs latitude (rad), longitude (rad), and altitude (m).
-    # Uses an application of Ferrari's Solution, supposedly has a lower error in the latitude and is much more algebraic in its notation
+    # Uses an application of Ferrari's Solution, supposedly has a lower error in the latitude and is much more
+    #   algebraic in its notation
+    # Converts ECEF coordinates to Geodetic coordinates, using Quan & Zheng 2024
     # Jarrett Usui, Maybelline Flesher
     def ecef_to_geodetic(self, x_ecef,y_ecef,z_ecef):
         # Step 1: Prepare the initialized constants and variables
@@ -217,6 +218,8 @@ class State:
     # Uses X, Y, Z as ECEF (float), as well as default max iterations of 5 and a convergence tolerance of 1e-12,
     #   and outputs latitude (rad), longitude (rad), and altitude (m)
     # Has a higher error of the latitude versus the more algebraic closed-form approach
+    # Converts ECEF coordinates to Geodetic coordinates using Bowrings Method
+    # Maybelline Flesher
     def ecef_to_geodetic_bowring(self, x_ecef, y_ecef, z_ecef, max_iter=5, tol=1e-12):
         # Step 1: Calculate Longitude
         long = np.arctan2(y_ecef, x_ecef)
@@ -242,3 +245,12 @@ class State:
         alt = r / np.cos(lat) - n
 
         return lat, long, alt
+
+    #TODO: ECEF to ECI
+    def ecef_to_eci(self, x_ecef, y_ecef, z_ecef):
+        return
+
+    #TODO: ECI to ECEF
+    def eci_to_ecef(self):
+        return
+
