@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import scipy as sp 
 import matplotlib.pyplot as plt
-from gravity import Gravity
+from Gravity.gravity import Gravity
 
 
 #TODO: Implement other methods to load sat data, helper functions for sph. coordinates. 
