@@ -44,10 +44,10 @@ The Earth's gravitational field is not perfectly spherical. The EGM2008 model pr
 **Mathematical Formulation:**
 The gravitational potential V is expressed as:
 
-![Gravitational Potential Equation](https://latex.codecogs.com/svg.latex?5Cbg_white%20-\frac{GM_{\oplus}}{r}%20+%20\sum_{n=2}^{N_z}%20\frac{J_n%20P_n^{0}(\cos\theta)}{r^{n+1}}%20+%20\sum_{n=2}^{N_t}%20\sum_{m=1}^{n}%20\frac{P_n^{m}(\cos\theta)\,(C_n^m%20\cos(m\phi)%20+%20S_n^m%20\sin(m\phi))}{r^{n+1}})
+![Gravitational Potential Equation](https://latex.codecogs.com/png.image?\dpi{110}\bg{white}&space;U=\frac{GM_{\oplus}}{r}%20&plus;%20\sum_{n=2}^{N_z}%20\frac{J_n%20P_n^{0}(\cos\theta)}{r^{n&plus;1}}%20&plus;%20\sum_{n=2}^{N_t}%20\sum_{m=1}^{n}%20\frac{P_n^{m}(\cos\theta)\,(C_n^m%20\cos(m\phi)%20&plus;%20S_n^m%20\sin(m\phi))}{r^{n&plus;1}})
 
 Where:
-- \($ GM_{\oplus} $\): Earth's gravitational parameter (μ ≈ 3.986004418 × 10¹⁴ m³/s²)
+- \( $GM_{\oplus}$ \): Earth's gravitational parameter (μ ≈ 3.986004418 × 10¹⁴ m³/s²)
 - \( $r, \theta, \phi$ \): Spherical coordinates (radius, latitude, longitude)
 - \( $P_n^m$ \): Associated Legendre functions
 - \($ J_n$ \): Zonal harmonics (axisymmetric perturbations)
