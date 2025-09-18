@@ -1,0 +1,86 @@
+![Gravitational Potential](https://latex.codecogs.com/svg.latex?-\frac{GM_{\oplus}}{r}%20+%20\sum_{n=2}^{N_z}%20\frac{J_n%20P_n^{0}(\cos\theta)}{r^{n+1}}%20+%20\sum_{n=2}^{N_t}%20\sum_{m=1}^{n}%20\frac{P_n^{m}(\cos\theta)\,(C_n^m%20\cos(m\phi)%20+%20S_n^m%20\sin(m\phi))}{r^{n+1}})
+
+
+Basically, from what I've read from the wiki page, if I'm getting this right, here's the description
+of each variable, coefficient, each section of the equation, and the process of how we want to proceed:
+
+Spherical Coords -> Cartesian Coords
+x = r * cos(theta) * cos(phi)
+y = r * cos(theta) * sin(phi)
+z = r * sin(theta)
+
+Cartesian Coords -> Spherical Coords
+r_x = x/(cos(theta)*cos(phi))
+r_y = y/(cos(theta)*sin(phi))
+r_z = z/(sin(theta))
+theta_x = acos(x/(r*cos(phi)))
+theta_y = acos(y/(r*sin(phi)))
+theta_z = asin(z/r)
+phi_x = acos(x/(r*cos(theta)))
+phi_y = asin(y/(r*cos(theta)))
+
+Where...
+For P_n^0(x) = -P_n^0(-x),
+J_n is every non-zero coefficient that is odd, relative to n (that exists in P_n^0), representing that there
+is no symmetry between the two (north and south) hemispheres, parallel to the equator, and/or the two (east and west)
+hemispheres, perpendicular to the equator, based on how the mass of Earth is distributed.
+
+C_n^m and S_n^m, both being non-zero coefficients, represent that there is no rotational symmetry about the polar axis,
+based on how the mass of Earth is distributed.
+
+----------------
+
+How we may try to attempt the algorithm:
+
+Make a final variable 'mu', that is a truncated double value down to 4-5 decimal places, of the Gravitational Constant
+multiplied by the mass of the Earth (which I'm pretty sure is a constant)
+
+Make a function that takes in the r value and conducts {a}, effectively producing a value from -(mu / r)
+
+--continue here-- 21:41 02/12/2025
+
+x: [r->, v->] = [r_x, r_y, r_z, v_x, v_y, v_z] (INPUT VARIABLES)
+t
+
+v->: d/dt*r->
+a->: d/dt*v->
+
+r_(t+1)=r_t+v_t*dt
+v_(t+1)=v_t+a_t*dt
+x_(t+1)=x_t+x_t*dt
+
+We want to predict the position of the object after t seconds
+
+
+~May
+
+**rk8 - need to update**
+def update(self, dt):
+        r = self.r()
+        v = self.v()
+
+        k1_r = v
+        k1_v = acceleration_g(r)
+
+        k2_r = v + (0.5 * dt * k1_v)
+        k2_v = acceleration_g(r + (0.5 * dt * k1_r))
+
+        k3_r = v + (0.5 * dt * k2_v)
+        k3_v = acceleration_g(r + (0.5 * dt * k2_r))
+
+        k4_r = v + (dt * k3_v)
+        k4_v = acceleration_g(r + (dt * k3_r))
+
+        r_new = r + v*dt
+        v_new = v + *dt
+
+        self.set_r(r_new)
+        self.set_v(v_new)
+        return np.concatenate((r_new, v_new))
+
+
+
+def acceleration_g(r):
+    # TODO: Add Higher order harmonics, make into own file
+    mu = 398600.4418
+    r_norm = np.linalg.norm(r)
