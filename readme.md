@@ -44,14 +44,14 @@ The Earth's gravitational field is not perfectly spherical. The EGM2008 model pr
 **Mathematical Formulation:**
 The gravitational potential V is expressed as:
 
-![Gravitational Potential Equation](https://latex.codecogs.com/svg.latex?V%20=%20-\frac{GM_{\oplus}}{r}%20+%20\sum_{n=2}^{N_z}%20\frac{J_n%20P_n^{0}(\cos\theta)}{r^{n+1}}%20+%20\sum_{n=2}^{N_t}%20\sum_{m=1}^{n}%20\frac{P_n^{m}(\cos\theta)\,(C_n^m%20\cos(m\phi)%20+%20S_n^m%20\sin(m\phi))}{r^{n+1}})
+![Gravitational Potential Equation](https://latex.codecogs.com/svg.latex?5Cbg_white%20-\frac{GM_{\oplus}}{r}%20+%20\sum_{n=2}^{N_z}%20\frac{J_n%20P_n^{0}(\cos\theta)}{r^{n+1}}%20+%20\sum_{n=2}^{N_t}%20\sum_{m=1}^{n}%20\frac{P_n^{m}(\cos\theta)\,(C_n^m%20\cos(m\phi)%20+%20S_n^m%20\sin(m\phi))}{r^{n+1}})
 
 Where:
-- \( GM_{\oplus} \): Earth's gravitational parameter (μ ≈ 3.986004418 × 10¹⁴ m³/s²)
-- \( r, \theta, \phi \): Spherical coordinates (radius, latitude, longitude)
-- \( P_n^m \): Associated Legendre functions
-- \( J_n \): Zonal harmonics (axisymmetric perturbations)
-- \( C_n^m, S_n^m \): Tesseral and sectoral harmonics (asymmetric perturbations from EGM2008)
+- \($ GM_{\oplus} $\): Earth's gravitational parameter (μ ≈ 3.986004418 × 10¹⁴ m³/s²)
+- \( $r, \theta, \phi$ \): Spherical coordinates (radius, latitude, longitude)
+- \( $P_n^m$ \): Associated Legendre functions
+- \($ J_n$ \): Zonal harmonics (axisymmetric perturbations)
+- \( $C_n^m, S_n^m$ \): Tesseral and sectoral harmonics (asymmetric perturbations from EGM2008)
 
 **Implementation:**
 - Loads EGM2008 coefficients from `data/EGM2008NM1000.csv`
@@ -64,12 +64,12 @@ Atmospheric drag becomes significant in LEO, especially at altitudes below 1000 
 
 **Key Concepts:**
 - **Density Model**: Uses atmospheric density models (e.g., NRLMSISE-00) based on altitude, solar activity, and geomagnetic conditions
-- **Drag Force**: \( \vec{F_d} = -\frac{1}{2} C_d A \rho v^2 \hat{v} \)
-  - \( C_d \): Drag coefficient
-  - \( A \): Satellite cross-sectional area
-  - \( \rho \): Atmospheric density
-  - \( v \): Satellite velocity relative to atmosphere
-- **Acceleration**: \( \vec{a_d} = \frac{\vec{F_d}}{m} \)
+- **Drag Force**: \( \$vec{F_d} = -\frac{1}{2} C_d A \rho v^2 \hat{v}$ \)
+  - \( $C_d$ \): Drag coefficient
+  - \( $A$ \): Satellite cross-sectional area
+  - \( $\rho$ \): Atmospheric density
+  - \( $v$ \): Satellite velocity relative to atmosphere
+- **Acceleration**: \( $\vec{a_d} = \frac{\vec{F_d}}{m}$ \)
 
 **Implementation:**
 - Calculates atmospheric density based on position and time
@@ -85,9 +85,9 @@ Gravitational perturbations from celestial bodies other than Earth, primarily th
 
 **Mathematical Approach:**
 - Computes gravitational acceleration from Moon and Sun positions
-- Adds perturbation acceleration: \( \vec{a_{ext}} = -\mu_{body} \frac{\vec{r_{sat}} - \vec{r_{body}}}{|\vec{r_{sat}} - \vec{r_{body}}|^3} \)
-  - \( \mu_{body} \): Gravitational parameter of the perturbing body
-  - \( \vec{r_{sat}}, \vec{r_{body}} \): Position vectors of satellite and perturbing body
+- Adds perturbation acceleration: \( $\vec{a_{ext}} = -\mu_{body} \frac{\vec{r_{sat}} - \vec{r_{body}}}{|\vec{r_{sat}} - \vec{r_{body}}|^3}$ \)
+  - \( $\mu_{body}$ \): Gravitational parameter of the perturbing body
+  - \( $\vec{r_{sat}}, \vec{r_{body}}$ \): Position vectors of satellite and perturbing body
 
 **Implementation:**
 - Tracks Moon and Sun positions using ephemeris data
@@ -98,12 +98,12 @@ Gravitational perturbations from celestial bodies other than Earth, primarily th
 Solar radiation exerts pressure on satellite surfaces due to photon momentum transfer. This is particularly important for satellites with large solar panels or high area-to-mass ratios.
 
 **Key Concepts:**
-- **Radiation Pressure**: \( P_{SRP} = \frac{F_{solar}}{c} \) where F_solar is solar flux and c is speed of light
+- **Radiation Pressure**: \( $P_{SRP} = \frac{F_{solar}}{c}$ \) where F_solar is solar flux and c is speed of light
 - **Force on Satellite**: Depends on surface properties, orientation, and shadowing
-- **Acceleration**: \( \vec{a_{SRP}} = \frac{P_{SRP} A_{eff}}{m} \hat{n} \)
-  - \( A_{eff} \): Effective cross-sectional area
-  - \( m \): Satellite mass
-  - \( \hat{n} \): Surface normal direction
+- **Acceleration**: \( $\vec{a_{SRP}} = \frac{P_{SRP} A_{eff}}{m} \hat{n}$ \)
+  - \( $A_{eff}$ \): Effective cross-sectional area
+  - \( $m$ \): Satellite mass
+  - \( $\hat{n}$ \): Surface normal direction
 
 **Implementation:**
 - Models SRP based on satellite attitude and solar position
@@ -153,10 +153,8 @@ LEO-HPOP-project/
 
 ## References
 
-- EGM2008: Pavlis, N.K., et al. (2012). The development and evaluation of the Earth Gravitational Model 2008 (EGM2008).
-- Atmospheric Models: NRLMSISE-00 empirical model
-- Orbital Mechanics: Vallado, D.A. (2007). Fundamentals of Astrodynamics and Applications.
+
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+idk
