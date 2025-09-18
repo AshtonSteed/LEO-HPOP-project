@@ -99,8 +99,6 @@ class State:
 
         return self.state_list.append(State(r_new, v_new, self.t + dt))
 
-    #TODO: Conversion functions between ECEF and Geodetic Coordinates, (Quan & Zeng, 2024)
-    #TODO: Also tack on conversion between ECEF and ECI using epoc of choice (J2000?)
 
     def acceleration_g(r):
         # TODO: Add Higher order harmonics, make into own file
@@ -110,6 +108,7 @@ class State:
         return -mu * r / (r_norm ** 3)
 
     # Takes Initial state and numerically integrates with time step dt n times
+    @staticmethod
     def integrate(old_state, dt, t):
         # TODO: Implement a better integration method, Add Drag/ Other perturbations
         n = int(t / dt)
@@ -119,20 +118,20 @@ class State:
             current_state = current_state.state_update(dt)
         return current_state
 
-    def main():
+    def main(self):
         print("Hello World 2!")
         r = np.array([6878.0, 0, 0])
         v = np.array([0, 7.61268, 0])
-        Sat1 = State(r, v, 0)
-        T = 94.61 * 60
+        sat1 = State(r, v, 0)
+        time = 94.61 * 60
         dt = 1 #seconds
         ###
 
-        print("Start position: ", Sat1.r())
+        print("Start position: ", sat1.r())
 
-        Satfinal = integrate(Sat1, dt, T * 30 )
+        sat_final = self.integrate(sat1, dt, time * 30 )
 
-        print("End Position: ", Satfinal.r())
+        print("End Position: ", sat_final.r())
 
     if __name__ == "__main__":
         main()
@@ -147,9 +146,9 @@ class State:
         return self.a**2 / np.sqrt(var1 + var2)
 
     # Geodetic to ECEF (Earth Centered, Earth Fixed)
-    # Uses latitude, longitude, and altitude as input for calculations, outputs XYZ
+    # Uses latitude (rad), longitude (rad), and altitude (m) as Geodetic coordinates, outputs X, Y, Z (float)
     # N represents ellipsoid radius of curvature in the prime vertical plane
-    # Function converts Geodetic (latitude, longitude, altitude) coordinates into Earth Centered Earth Fixed (ECEF) coordinates, or x,y,z
+    # Converts Geodetic coordinates to ECEF coordinates
     # Jarrett Usui, Maybelline Flesher
     def geodetic_to_ecef(self, lat, long, alt):
         n_phi = self.prime_vertical_radius(lat)
@@ -159,18 +158,99 @@ class State:
         return x_ecef, y_ecef, z_ecef
 
     # ECEF to Geodetic
-    # Uses XYZ coordinates as input for calculations, and outputs latitude, longitude, and altitude.
-    # Uses an application of Ferrari's solution, supposedly (Zhu 1994) is the most accurate, proposed
-    #   by Heikkinen (1984)
-    # I can't find Heikkinen's, but (You 2000) presents the math behind it. We will be using a
-    #   Non-Iterative Method of the Zeroth Order.
-    # Function converts Cartesian ECEF coords (X,Y,Z) into Geodetic (latitude, longitude, altitude)
+    # Uses X, Y, Z as ECEF coordinates (float), and outputs latitude (rad), longitude (rad), and altitude (m).
+    # Uses an application of Ferrari's Solution, supposedly has a lower error in the latitude and is much more
+    #   algebraic in its notation
+    # Converts ECEF coordinates to Geodetic coordinates, using Quan & Zheng 2024
     # Jarrett Usui, Maybelline Flesher
-    def Convert2Geodetic(self, x_ecef,y_ecef,z_ecef):
-        l = (self.a*
-        latitude = 2*np.arctan(Z/(I+S))
-        longitude = np.sign(Y)*(np.pi/2-2*np.arctan(X/(W+abs(Y)))
-        altitude = -1*np.sqrt(1-e**2)*sqrt(a**2-m/e**2)
-        return (latitude,longitude,altitude)
+    def ecef_to_geodetic(self, x_ecef,y_ecef,z_ecef):
+        # Step 1: Prepare the initialized constants and variables
+        l = (self.am * self.eccm_2**2)**2
+        m = x_ecef**2 + y_ecef**2 #when talking about w^2, just use m for simplicity's sake
+        w_axis = np.sqrt(m)
+        n = z_ecef**2
+        n_c = (1-self.eccm_2)*n
+        p = m + n_c - l
+        q = 27 * m * n_c * l
 
+        # Step 2: Distinguish the applicable zone
+        if p**3 + q >= 0:
+            temp_1 = (np.sqrt(p**3 + q) + np.sqrt(q))**(2/3)
+            temp_2 = (np.sqrt(p**3 + q) - np.sqrt(q))**(2/3)
+            t = p + temp_1 + temp_2
+        else:
+            temp_1 = np.sqrt(-q/p)
+            temp_2 = (np.arccos(np.sqrt(-q/(p**3))))/3
+            t = temp_1/(np.cos(temp_2))
+
+        # If variable "t" passes the isfinite check (meaning that it is not an infinite float and it's not NaN)
+        if np.isfinite(t):
+
+            # Step 3: Compute the intermediate variables
+            u_m = np.sqrt((36 * m * l) + t**2)
+            u_n_c = np.sqrt((36 * n_c * l) + t**2)
+            v = u_m + u_n_c
+            w = (2 * t) + (6 * l) + v
+            i = (2 * (t + u_n_c))/(w + np.sqrt(6 * l * (w + v + 6*(m + n_c))))
+            s = np.sqrt(i**2 + n)
+
+            # Step 4: Compute Geodetic Coordinates if the following:
+            if t > 0 or n > 0:
+                lat = m*np.sign(y_ecef) * ((np.pi / 2) - 2 * np.arctan(x_ecef / (w_axis + np.abs(y_ecef))))
+                long = 2 * np.arctan(z_ecef / (i + s))
+                alt = (w_axis * i) + n + (self.am * np.sqrt(i**2 + n_c))
+                return lat, long, alt
+
+            # Step 5: Compute Geodetic Coordinates if the following:
+            if t == 0 and n == 0:
+                lat = m * np.sign(y_ecef) * ((np.pi / 2) - 2 * np.arctan(x_ecef / (w_axis + np.abs(y_ecef))))
+                long = 2 * np.arctan2(y_ecef, x_ecef)
+                alt = -1 * np.sqrt(1 - self.eccm_2)
+                return lat, long, alt
+
+        # If the variable "t" fails the isfinite() check:
+        # We switch to an iterative method called the Bowring Method, which has the same validity but may
+        #   be worse, efficiency-wise. Both methods follow O(n) growth since the variables are constant
+        else:
+            return self.ecef_to_geodetic_bowring(x_ecef, y_ecef, z_ecef)
+
+    # ECEF to Geodetic (Using Bowring's Iterative Method)
+    # Uses X, Y, Z as ECEF (float), as well as default max iterations of 5 and a convergence tolerance of 1e-12,
+    #   and outputs latitude (rad), longitude (rad), and altitude (m)
+    # Has a higher error of the latitude versus the more algebraic closed-form approach
+    # Converts ECEF coordinates to Geodetic coordinates using Bowrings Method
+    # Maybelline Flesher
+    def ecef_to_geodetic_bowring(self, x_ecef, y_ecef, z_ecef, max_iter=5, tol=1e-12):
+        # Step 1: Calculate Longitude
+        long = np.arctan2(y_ecef, x_ecef)
+
+        # Step 2: Find the distance from the Z-axis
+        r = np.sqrt(x_ecef**2 + y_ecef**2)
+
+        # Step 3: Initial guess for latitude
+        lat = np.arctan2(z_ecef, r * (1 - self.eccm_2))
+
+        # Step 4: Iteratively refine latitude
+        for _ in range(max_iter):
+            n = self.am / np.sqrt(1 - self.eccm_2 * np.sin(lat)**2)  # Radius of curvature
+            alt = r / np.cos(lat) - n
+            lat_new = np.arctan2(z_ecef, r * (1 - self.eccm_2 * n / (n + alt)))
+            if np.abs(lat_new - lat) < tol:
+                lat = lat_new
+                break
+            lat = lat_new
+
+        # Step 5: Final altitude calculation using latitude
+        n = self.am / np.sqrt(1 - self.eccm_2 * np.sin(lat)**2)
+        alt = r / np.cos(lat) - n
+
+        return lat, long, alt
+
+    #TODO: ECEF to ECI
+    def ecef_to_eci(self, x_ecef, y_ecef, z_ecef):
+        return
+
+    #TODO: ECI to ECEF
+    def eci_to_ecef(self):
+        return
 
