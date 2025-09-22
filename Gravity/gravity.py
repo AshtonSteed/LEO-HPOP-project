@@ -111,7 +111,7 @@ class Gravity:
         i = 0  # Index for accessing harmonics
         
         # Iterate until the relative error is within the acceptable limit or n reaches nmax
-        while not (m == 0 and abs(newu - oldun) <= relerror * newu) and n <= nmax:
+        while not (m == 0 and np.abs(newu - oldun) <= relerror * newu) and n <= nmax:
             # Update the previous approximation when m is 0
             if m == 0:
                 oldun = newu
@@ -199,6 +199,75 @@ class Gravity:
         
         plt.show()
     #TODO make a function that returns a vector [ar, atheta, aphi] in Fixed Geocentric coordinates.  
+    def acceleration_g(self, r, theta, phi, nmax=20, mmax=20, relerror=0E-2):
+        """
+        Calculate the gravitational potential at a given point in Earth-fixed coordinates
+
+        Parameters:
+        r (float): Distance from the center of mass (CoM) in kilometers.
+        theta (float): North polar angle in radians (0 to pi).
+        phi (float): Angle from the prime meridian in radians (0 to 2*pi).
+        nmax (int): Maximum order of terms to consider in the summation.
+        mmax (int): Maximum degree of terms to consider in the summation.
+        relerror (float): Maximum relative error acceptable. If 0, only nmax and mmax are used.
+
+        Returns:
+        A spherical acceleration vector with terms [ar, atheta, aphi]
+        """
+        
+        #initialize acceleration vector and approximate acceleration vector
+        a = np.array([1,0,0], dtype=float) # 1 is main radial acceleration term
+        a_old = np.array([1,0,0], dtype=float)
+        
+        # Normalize the distance with respect to the reference radius
+        rnorm = self.r / r
+        
+        # Calculate all normalized spherical Legendre polynomials up to nmax and mmax
+        legendrearray = sp.special.sph_legendre_p_all(nmax, mmax, theta, diff_n=1)
+        #Assign slices of legendre polynomials to values and derivatives
+        # legendre[n, m] represents P(cos(theta)), where n is the order and m is the degree
+        legendre = legendrearray[0]
+        # Same for derivatives, but d(P(cos(theta)))/(d theta) of n,m
+        legendrederiv = legendrearray[1]
+        
+        
+        
+        # Initialize indices for the summation
+        n = 2  # Starting order
+        m = 0  # Starting degree
+        i = 0  # Index for accessing harmonics
+        
+        # Iterate until the relative error is within the acceptable limit or n reaches nmax
+        while n <= nmax:
+            if m == 0:
+                a_old = a
+            # Add next term for each acceleration component
+            
+            #Radial Acceleration
+            a[0] += (n+1) * rnorm**n * legendre[n,m] * (self.harmonics[i, 0] * np.cos(m * phi) + self.harmonics[i, 1] * np.sin(m * phi))
+            
+            #Theta Acceleration
+            a[1] += rnorm**n * legendrederiv[n,m] * (self.harmonics[i, 0] * np.cos(m * phi) + self.harmonics[i, 1] * np.sin(m * phi))
+            
+            #Phi Acceleration
+            a[2] += m * rnorm**n * legendre[n,m] * (self.harmonics[i, 1] * np.cos(m * phi) - self.harmonics[i, 0] * np.cos(m * phi))
+            
+            
+            
+            
+            # Increment the index for harmonics
+            i += 1
+            
+            # Determine whether to increment m or n
+            m_increment = (m < n) and m < mmax  # Boolean flag to control incrementing m or n
+            m = (m + m_increment) * (1 - (not m_increment))  # Increment m or reset to 0
+            n += (not m_increment)  # Increment n only if m reaches n or mmax
+        
+        #vector of scaler terms and radial base
+        scalars = np.array([-self.mu / (r**2), self.mu/(r**2), -self.mu / (r**2 * np.sin(theta))])
+        # Return the acceleration vector
+        return a * scalars
+   
 
     
 if __name__ == '__main__':
@@ -212,9 +281,11 @@ if __name__ == '__main__':
     theta_daytona = np.radians(90-29.218103)
     phi_daytona = np.radians(-81.031723)
     
-    theta = np.linspace(0,np.pi, 100)
+    print(ag.acceleration_g(r, theta_daytona, phi_daytona))
+    
+    #theta = np.linspace(0,np.pi, 100)
     
     
-    ag.plot_potential(50, nmax=10)
+    #ag.plot_potential(50, nmax=10)
     
 
