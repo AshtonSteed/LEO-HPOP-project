@@ -1,5 +1,9 @@
 import numpy as np
 import butchertableau as bt
+from datetime import datetime, timezone
+from astropy.time import Time
+from astropy.coordinates import EarthLocation, ITRS, GCRS, CartesianRepresentation
+import astropy.units as u
 
 
 # U = -(G*M_earth)/r) + {a}
@@ -49,9 +53,11 @@ class State:
     def r(self):
         return self.state[:3]
 
+
     # Helper Function to return velocity vector
     def v(self):
         return self.state[3:]
+
 
     # RK4
     # TODO: Add even higher order integration, RK8??, might be nice to move acceleration call directly into this update
@@ -107,6 +113,7 @@ class State:
         r_norm = np.linalg.norm(r)
         return -mu * r / (r_norm ** 3)
 
+
     # Takes Initial state and numerically integrates with time step dt n times
     @staticmethod
     def integrate(old_state, dt, t):
@@ -117,6 +124,7 @@ class State:
             #a = acceleration_g(current_state.r())
             current_state = current_state.state_update(dt)
         return current_state
+
 
     def main(self):
         print("Hello World 2!")
@@ -136,14 +144,15 @@ class State:
     if __name__ == "__main__":
         main()
 
-    # From (You 2000), other various sources
 
-    # Defining N(phi) in the GtECEF conversion
+    # Defining N(phi) in the Geodetic to ECEF conversion
+    # Inputs latitude (rad), outputs...something. it's just kinda as a middleman to make things more readable
     # Maybelline Flesher
     def prime_vertical_radius(self, lat):
         var1 = self.a**2 * np.cos(lat)**2
         var2 = self.b**2 * np.sin(lat)**2
         return self.a**2 / np.sqrt(var1 + var2)
+
 
     # Geodetic to ECEF (Earth Centered, Earth Fixed)
     # Uses latitude (rad), longitude (rad), and altitude (m) as Geodetic coordinates, outputs X, Y, Z (float)
@@ -156,6 +165,7 @@ class State:
         y_ecef = (n_phi + alt) * np.cos(long) * np.sin(lat)
         z_ecef = ((n_phi * (self.b**2/self.a**2)) + alt)*np.sin(long)
         return x_ecef, y_ecef, z_ecef
+
 
     # ECEF to Geodetic
     # Uses X, Y, Z as ECEF coordinates (float), and outputs latitude (rad), longitude (rad), and altitude (m).
@@ -214,6 +224,7 @@ class State:
         else:
             return self.ecef_to_geodetic_bowring(x_ecef, y_ecef, z_ecef)
 
+
     # ECEF to Geodetic (Using Bowring's Iterative Method)
     # Uses X, Y, Z as ECEF (float), as well as default max iterations of 5 and a convergence tolerance of 1e-12,
     #   and outputs latitude (rad), longitude (rad), and altitude (m)
@@ -246,11 +257,68 @@ class State:
 
         return lat, long, alt
 
-    #TODO: ECEF to ECI
-    def ecef_to_eci(self, x_ecef, y_ecef, z_ecef):
-        return
 
-    #TODO: ECI to ECEF
-    def eci_to_ecef(self):
-        return
+    # UTC to Julian Date
+    # Inputs as the UTC date/time (float), outputs to a Julian Date (float)
+    # Maybelline Flesher
+    @staticmethod
+    def utc_to_julian(dt: datetime) -> float:
+        dt = dt.astimezone(timezone.utc)
+        year, month = dt.year, dt.month
+        day = dt.day + (dt.hour + (dt.minute + dt.second / 60.0) / 60.0) / 24.0
+
+        if month <= 2:
+            year -= 1
+            month += 12
+
+        a = int(year / 100)
+        b = 2 - a + int(a / 4)
+
+        julian_date = int(365.25 * (year + 4716)) + int(30.6001 * (month + 1)) + day + b - 1524.5
+        return julian_date
+
+    # The Greenwich Mean Sidereal Time (rad)
+    # Input as the Julian Date, and output as the GMST in radians
+    @staticmethod
+    def gmst_angle(julian_date: float) -> float:
+        """Greenwich Mean Sidereal Time (radians)."""
+        time = (julian_date - 2451545.0) / 36525.0  # Julian centuries from J2000
+        gmst = 280.46061837 + 360.98564736629 * (julian_date - 2451545.0) \
+               + 0.000387933 * time**2 - time**3 / 38710000.0
+        gmst = np.deg2rad(gmst % 360.0)
+        return gmst
+
+    # ECEF to ECI (GCRF)
+    # Input as X, Y, Z coordinates (float) (non-inertial frame), and output as X, Y, Z
+    #   coordinates (float) (inertial frame)
+    # Maybelline Flesher
+    def ecef_to_gcrf(self, x_ecef, y_ecef, z_ecef, dt: datetime):
+        # Convert datetime to Astropy Time
+        t = Time(dt, scale="utc")
+
+        # Represent ECEF vector in ITRS frame (ECEF = ITRS)
+        itrs = ITRS(x=x_ecef * u.cm*100, y=y_ecef * u.cm*100, z=z_ecef * u.cm*100, obstime=t)
+
+        # Convert to GCRS (which is aligned to GCRF, Earth-centered)
+        gcrs = itrs.transform_to(GCRS(obstime=t))
+
+        # Return as X, Y, Z
+        return gcrs.cartesian.x.to(u.cm*100).value, gcrs.cartesian.y.to(u.cm*100).value, gcrs.cartesian.z.to(u.cm*100).value
+
+
+
+
+    #TODO: GCRF to ECEF
+    def eci_to_ecef(self, x_eci, y_eci, z_eci, dt: datetime):
+        # Convert datetime to Astropy Time
+        t = Time(dt, scale="utc")
+
+        # Represent ECEF vector in ITRS frame (ECEF = ITRS)
+        gcrs = GCRS(x=x_eci * u.cm * 100, y=y_eci * u.cm * 100, z=z_eci * u.cm * 100, obstime=t)
+
+        # Convert to GCRS (which is aligned to GCRF, Earth-centered)
+        itrs = gcrs.transform_to(ITRS(obstime=t))
+
+        # Return as X, Y, Z
+        return itrs.cartesian.x.to(u.cm*100).value, itrs.cartesian.y.to(u.cm*100).value, itrs.cartesian.z.to(u.cm*100).value
 
