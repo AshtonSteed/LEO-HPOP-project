@@ -2,8 +2,9 @@ import numpy as np
 import butchertableau as bt
 from datetime import datetime, timezone
 from astropy.time import Time
-from astropy.coordinates import EarthLocation, ITRS, GCRS, CartesianRepresentation
+from astropy.coordinates import ITRS, GCRS
 import astropy.units as u
+import Gravity as g
 
 
 # U = -(G*M_earth)/r) + {a}
@@ -61,7 +62,7 @@ class State:
 
     # RK4
     # TODO: Add even higher order integration, RK8??, might be nice to move acceleration call directly into this update
-    # TODO: Change acceleration to be a function of the state, add other pertubations to acceleration()
+    # TODO: Change acceleration to be a function of the state, add other perturbations to acceleration()
     def state_update(self, dt):
         initial_state = self.last_state()
         x = bt.butcher(8, 0)
@@ -70,10 +71,10 @@ class State:
         v = initial_state.v()
 
         k1_r = v
-        k1_v = acceleration_g(r)
+        k1_v = g.acceleration_g(r)
 
         k2_r = v + ((4/27) * dt * k1_v)
-        k2_v = acceleration_g(r + (4/27 * dt * k1_r))
+        k2_v = g.acceleration_g(r + (4/27 * dt * k1_r))
 
         k3_r = v + ((2/9) * dt * k2_v)
         k3_v = acceleration_g(r + ((2/9) * dt * k2_r))
@@ -105,14 +106,14 @@ class State:
 
         return self.state_list.append(State(r_new, v_new, self.t + dt))
 
-
+    """
     def acceleration_g(r):
         # TODO: Add Higher order harmonics, make into own file
         # Calculates acceleration due to gravity assuming point mass Earth
         mu = 398600.4418
         r_norm = np.linalg.norm(r)
         return -mu * r / (r_norm ** 3)
-
+    """
 
     # Takes Initial state and numerically integrates with time step dt n times
     @staticmethod
@@ -143,6 +144,7 @@ class State:
 
     if __name__ == "__main__":
         main()
+
 
 
     # Defining N(phi) in the Geodetic to ECEF conversion
@@ -306,9 +308,6 @@ class State:
         return gcrs.cartesian.x.to(u.cm*100).value, gcrs.cartesian.y.to(u.cm*100).value, gcrs.cartesian.z.to(u.cm*100).value
 
 
-
-
-    #TODO: GCRF to ECEF
     def eci_to_ecef(self, x_eci, y_eci, z_eci, dt: datetime):
         # Convert datetime to Astropy Time
         t = Time(dt, scale="utc")
