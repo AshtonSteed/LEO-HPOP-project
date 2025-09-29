@@ -50,25 +50,14 @@ class State:
 
     # Makes an arrayList of states, we can use this to get the most recent state (such as state_list[-1])
 
-    # Helper Function to return position vector
-    def r(self):
-        return self.state[:3]
 
-
-    # Helper Function to return velocity vector
-    def v(self):
-        return self.state[3:]
-
-
-    # RK4
+    # RK8
     # TODO: Add even higher order integration, RK8??, might be nice to move acceleration call directly into this update
     # TODO: Change acceleration to be a function of the state, add other perturbations to acceleration()
     def state_update(self, dt):
-        initial_state = self.last_state()
-        x = bt.butcher(8, 0)
-        A, B, C = x.radau()
-        r = initial_state.r()
-        v = initial_state.v()
+        initial_state = self.state[:]
+        r = initial_state[:3]
+        v = initial_state[3:]
 
         k1_r = v
         k1_v = g.acceleration_g(r)
@@ -105,6 +94,87 @@ class State:
         v_new = v + (dt/6) * (k1_v + 2*k2_v + 2*k3_v + k4_v)
 
         return self.state_list.append(State(r_new, v_new, self.t + dt))
+
+    # Matlab Functions
+    """
+        %--------------------------------------------------------------------------
+        %
+        %  Runge-Kutta 8th Order
+        %
+        % Reference:
+        % Goddard Trajectory Determination System (GTDS): Mathematical Theory,
+        % Goddard Space Flight Center, 1989.
+        % 
+        % Last modified:   2019/04/15   Meysam Mahooti
+        % 
+        %--------------------------------------------------------------------------
+        function [y] = RK8(func, t, y, h )
+        
+        k_1 = func(t         ,y                                                                           );
+        k_2 = func(t+h*(4/27),y+(h*4/27)*k_1                                                              );
+        k_3 = func(t+h*(2/9) ,y+  (h/18)*(k_1+3*k_2)                                                      );
+        k_4 = func(t+h*(1/3) ,y+  (h/12)*(k_1+3*k_3)                                                      );
+        k_5 = func(t+h*(1/2) ,y+   (h/8)*(k_1+3*k_4)                                                      );
+        k_6 = func(t+h*(2/3) ,y+  (h/54)*(13*k_1-27*k_3+42*k_4+8*k_5)                                     );
+        k_7 = func(t+h*(1/6) ,y+(h/4320)*(389*k_1-54*k_3+966*k_4-824*k_5+243*k_6)                         );
+        k_8 = func(t+h       ,y+  (h/20)*(-234*k_1+81*k_3-1164*k_4+656*k_5-122*k_6+800*k_7)               );
+        k_9 = func(t+h*(5/6) ,y+ (h/288)*(-127*k_1+18*k_3-678*k_4+456*k_5-9*k_6+576*k_7+4*k_8)            );
+        k_10= func(t+h       ,y+(h/820)*(1481*k_1-81*k_3+7104*k_4-3376*k_5+72*k_6-5040*k_7-60*k_8+720*k_9));
+        
+        y = y + h/840*(41*k_1+27*k_4+272*k_5+27*k_6+216*k_7+216*k_9+41*k_10);
+        
+        end
+        
+        
+        % constants
+        GM    = 1;                      % gravitational coefficient
+        e     = 0.1;                    % eccentricity
+        Kep   = [1, e ,0 ,0 ,0 ,0]';    % Keplerian elements (a,e,i,Omega,omega,M)
+        
+        % header
+        fprintf( '\nRunge-Kutta 8th Order Integration\n\n' );
+        
+        % Initial state of satellite (x,y,z,vx,vy,vz)
+        y_0 = State(GM, Kep, 0);
+        
+        % step size
+        h = 0.01; % [s]
+        
+        % initial values
+        t_0 = 0; % [s]
+        t_end = 3600; % end time [s]
+        
+        Steps = t_end/h;
+        
+        tic
+        % Integration from t=t_0 to t=t_end
+        for i = 1:Steps-h
+            y = RK8(@Deriv, t_0, y_0, h);
+            y_0 = y;
+            t_0 = t_0 + h;
+        end
+        y_ref = State(GM, Kep, t_end); % Reference solution
+        
+        fprintf('Accuracy   Digits\n');
+        fprintf('%6.2e',norm(y-y_ref));
+        fprintf('%9.2f\n',-log10(norm(y-y_ref)));
+        toc
+        
+        
+        function yp = Deriv(t, y)
+
+        % State vector components
+        r = y(1:3);
+        v = y(4:6);
+        
+        % State vector derivative
+        yp = [v;-r/((norm(r))^3)];
+    """
+
+    # Derivative function
+    # input time, radius vector, velocity vector, output velocity vector,
+    def deriv(self, r, v, t):
+        return v, -r/(np.linalg.norm(r)**3)
 
     """
     def acceleration_g(r):
