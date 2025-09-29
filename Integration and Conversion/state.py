@@ -93,6 +93,21 @@ class State:
         r_new = r + (dt/6) * (k1_r + 2*k2_r + 2*k3_r + k4_r)
         v_new = v + (dt/6) * (k1_v + 2*k2_v + 2*k3_v + k4_v)
 
+        k_1 = self.deriv(t, y)
+        k_2 = self.deriv(t + h * (4 / 27), y + (h * 4 / 27) * k_1)
+        k_3 = self.deriv(t + h * (2 / 9), y + (h / 18) * (k_1 + 3 * k_2))
+        k_4 = self.deriv(t + h * (1 / 3), y + (h / 12) * (k_1 + 3 * k_3))
+        k_5 = self.deriv(t + h * (1 / 2), y + (h / 8) * (k_1 + 3 * k_4))
+        k_6 = self.deriv(t + h * (2 / 3), y + (h / 54) * (13 * k_1 - 27 * k_3 + 42 * k_4 + 8 * k_5))
+        k_7 = self.deriv(t + h * (1 / 6), y + (h / 4320) * (389 * k_1 - 54 * k_3 + 966 * k_4 - 824 * k_5 + 243 * k_6))
+        k_8 = self.deriv(t + h, y + (h / 20) * (-234 * k_1 + 81 * k_3 - 1164 * k_4 + 656 * k_5 - 122 * k_6 + 800 * k_7))
+        k_9 = self.deriv(t + h * (5 / 6),
+                   y + (h / 288) * (-127 * k_1 + 18 * k_3 - 678 * k_4 + 456 * k_5 - 9 * k_6 + 576 * k_7 + 4 * k_8))
+        k_10 = self.deriv(t + h, y + (h / 820) * (
+                    1481 * k_1 - 81 * k_3 + 7104 * k_4 - 3376 * k_5 + 72 * k_6 - 5040 * k_7 - 60 * k_8 + 720 * k_9))
+
+        y = y + h / 840 * (41 * k_1 + 27 * k_4 + 272 * k_5 + 27 * k_6 + 216 * k_7 + 216 * k_9 + 41 * k_10)
+
         return self.state_list.append(State(r_new, v_new, self.t + dt))
 
     # Matlab Functions
@@ -171,10 +186,11 @@ class State:
         yp = [v;-r/((norm(r))^3)];
     """
 
+
     # Derivative function
-    # input time, radius vector, velocity vector, output velocity vector,
+    # input time, radius vector, velocity vector, output array w/ velocity vector, acceleration vector
     def deriv(self, r, v, t):
-        return v, -r/(np.linalg.norm(r)**3)
+        return np.array(v, -r/(np.linalg.norm(r)**3))
 
     """
     def acceleration_g(r):
