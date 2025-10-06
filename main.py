@@ -31,7 +31,7 @@ class State:
 #   - statevec: A numpy array representing the current state vector [rx, ry, rz, vx, vy, vz]
 #   This function serves as the derivative function for scipy.integrate.solve_ivp, returning
 #   the derivatives of the state vector [vx, vy, vz, ax, ay, az].
-def state_update(t, statevec, g):
+def state_update(t, statevec, g: Gravity):
     
     # Initialize output array for derivatives [vx, vy, vz, ax, ay, az]
     output = np.zeros_like(statevec)
@@ -47,8 +47,16 @@ def state_update(t, statevec, g):
     r_norm = np.linalg.norm(r)
     a = -g.mu * r / (r_norm**3) # Point mass earth acceleration
     
+    #temp shpr coords
+    
+    theta = np.acos(r[2]/r_norm)
+    phi = np.atan(r[1]/r[0])
+    a_s = g.acceleration_g(r_norm, theta, phi)
+    #a = a_s[0] * np.array([np.cos(theta) * np.cos(a_s[2]), np.cos(theta) * np.sin(a_s[2]), np.sin(a_s[1])]) 
     # The first three elements of the output are the velocity components (dr/dt = v)
     output[:3] = v
+    
+    
     # The last three elements of the output are the acceleration components (dv/dt = a)
     output[3:] = a
     

@@ -407,3 +407,41 @@ class State:
         # Return as X, Y, Z
         return itrs.cartesian.x.to(u.cm*100).value, itrs.cartesian.y.to(u.cm*100).value, itrs.cartesian.z.to(u.cm*100).value
 
+
+    # Convert spherical vector to cartesian coordinate vector [r,theta,phi] -> [x,y,z]
+    @staticmethod
+    def sphr_to_xyz(sphr):
+        output = np.zeros(3)
+        
+        #unpack spherical cords
+        (r,theta,phi) = sphr
+        
+        #Calculate z and xy components
+        z = r * np.cos(theta)
+        xy = r * np.sin(theta)
+        
+        #Caculate x and y
+        x = xy * np.cos(phi)
+        y = xy * np.sin(phi)
+        
+        #Assign to output vector
+        output = x,y,z
+        
+        return output
+    
+    # Convert Spherical coordinates to Cartesian [xyz] -> [r, theta, phi]
+    @staticmethod
+    def xyz_to_sphr(xyz):
+        #create sphr vector
+        sphr = np.zeros(3)
+        
+        #unpack xyz
+        (x,y,z) = xyz
+        
+        r = np.linalg.norm(xyz)
+        phi = np.atan2(y,x)
+        theta = np.acos(z/r)
+        
+        sphr = r,theta,phi
+        return sphr
+    
