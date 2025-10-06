@@ -37,10 +37,10 @@ class State:
     state_list = []
     # R: Position vector [km]
     # V: Velocity Vector [km/s]
-    # t: Initial time [s]
-    def __init__(self, r, v, t):
+    # t: Initial time [julian]
+    def __init__(self, r, v, t_0):
         self.state = np.concatenate((r, v))
-        self.t = t
+        self.t = t_0
         self.state_list.append(self.state)
         self.a = 6378.137 #equatorial radius of the earth, km
         self.b = 6356.7523142 #polar radius of the earth, km
@@ -55,60 +55,25 @@ class State:
     # TODO: Add even higher order integration, RK8??, might be nice to move acceleration call directly into this update
     # TODO: Change acceleration to be a function of the state, add other perturbations to acceleration()
     def state_update(self, dt):
-        initial_state = self.state[:]
-        r = initial_state[:3]
-        v = initial_state[3:]
+        k_1 = self.deriv(self.t, self.state)
+        k_2 = self.deriv(self.t + dt * (4 / 27), self.state + (dt * 4 / 27) * k_1)
+        k_3 = self.deriv(self.t + dt * (2 / 9), self.state + (dt / 18) * (k_1 + 3 * k_2))
+        k_4 = self.deriv(self.t + dt * (1 / 3), self.state + (dt / 12) * (k_1 + 3 * k_3))
+        k_5 = self.deriv(self.t + dt * (1 / 2), self.state + (dt / 8) * (k_1 + 3 * k_4))
+        k_6 = self.deriv(self.t + dt * (2 / 3), self.state + (dt / 54) * (13 * k_1 - 27 * k_3 + 42 * k_4 + 8 * k_5))
+        k_7 = self.deriv(self.t + dt * (1 / 6), self.state + (dt / 4320) * (389 * k_1 - 54 * k_3 + 966 * k_4 - 824 *
+                                                                            k_5 + 243 * k_6))
+        k_8 = self.deriv(self.t + dt, self.state + (dt / 20) * (-234 * k_1 + 81 * k_3 - 1164 * k_4 + 656 * k_5 -
+                                                                122 * k_6 + 800 * k_7))
+        k_9 = self.deriv(self.t + dt * (5 / 6), self.state + (dt / 288) * (-127 * k_1 + 18 * k_3 - 678 * k_4 + 456 *
+                                                                           k_5 - 9 * k_6 + 576 * k_7 + 4 * k_8))
+        k_10 = self.deriv(self.t + dt, self.state + (dt / 820) * (1481 * k_1 - 81 * k_3 + 7104 * k_4 - 3376 * k_5 +
+                                                                  72 * k_6 - 5040 * k_7 - 60 * k_8 + 720 * k_9))
 
-        k1_r = v
-        k1_v = g.acceleration_g(r)
+        self.state = self.state + dt / 840 * (41 * k_1 + 27 * k_4 + 272 * k_5 + 27 * k_6 + 216 * k_7 + 216 * k_9 + 41
+                                              * k_10)
 
-        k2_r = v + ((4/27) * dt * k1_v)
-        k2_v = g.acceleration_g(r + (4/27 * dt * k1_r))
-
-        k3_r = v + ((2/9) * dt * k2_v)
-        k3_v = acceleration_g(r + ((2/9) * dt * k2_r))
-
-        k4_r = v + ((1/3) * dt * k3_v)
-        k4_v = acceleration_g(r + ((1/3) * dt * k3_r))
-
-        k5_r = v + ((1/2) * dt * k4_v)
-        k5_v = acceleration_g(r + ((1/2) * dt * k4_r))
-
-        k6_r = v + ((2/3) * dt * k5_v)
-        k6_v = acceleration_g(r + ((2/3) * dt * k5_r))
-
-        k7_r = v + ((1/6) * dt * k6_v)
-        k7_v = acceleration_g(r + ((1/6) * dt * k6_r))
-
-        k8_r = v + ((2/3) * dt * k7_v)
-        k8_v = acceleration_g(r + ((2/3) * dt * k7_r))
-
-        k9_r = v + ((5/6) * dt * k8_v)
-        k9_v = acceleration_g(r + ((5/6) * dt * k8_r))
-
-        k10_r = v + (dt * k9_v)
-        k10_v = acceleration_g(r + (dt * k9_r))
-
-
-        r_new = r + (dt/6) * (k1_r + 2*k2_r + 2*k3_r + k4_r)
-        v_new = v + (dt/6) * (k1_v + 2*k2_v + 2*k3_v + k4_v)
-
-        k_1 = self.deriv(t, y)
-        k_2 = self.deriv(t + h * (4 / 27), y + (h * 4 / 27) * k_1)
-        k_3 = self.deriv(t + h * (2 / 9), y + (h / 18) * (k_1 + 3 * k_2))
-        k_4 = self.deriv(t + h * (1 / 3), y + (h / 12) * (k_1 + 3 * k_3))
-        k_5 = self.deriv(t + h * (1 / 2), y + (h / 8) * (k_1 + 3 * k_4))
-        k_6 = self.deriv(t + h * (2 / 3), y + (h / 54) * (13 * k_1 - 27 * k_3 + 42 * k_4 + 8 * k_5))
-        k_7 = self.deriv(t + h * (1 / 6), y + (h / 4320) * (389 * k_1 - 54 * k_3 + 966 * k_4 - 824 * k_5 + 243 * k_6))
-        k_8 = self.deriv(t + h, y + (h / 20) * (-234 * k_1 + 81 * k_3 - 1164 * k_4 + 656 * k_5 - 122 * k_6 + 800 * k_7))
-        k_9 = self.deriv(t + h * (5 / 6),
-                   y + (h / 288) * (-127 * k_1 + 18 * k_3 - 678 * k_4 + 456 * k_5 - 9 * k_6 + 576 * k_7 + 4 * k_8))
-        k_10 = self.deriv(t + h, y + (h / 820) * (
-                    1481 * k_1 - 81 * k_3 + 7104 * k_4 - 3376 * k_5 + 72 * k_6 - 5040 * k_7 - 60 * k_8 + 720 * k_9))
-
-        y = y + h / 840 * (41 * k_1 + 27 * k_4 + 272 * k_5 + 27 * k_6 + 216 * k_7 + 216 * k_9 + 41 * k_10)
-
-        return self.state_list.append(State(r_new, v_new, self.t + dt))
+        return self.state_list.append(State(self.state[:3], self.state[3:], self.t + dt))
 
     # Matlab Functions
     """
@@ -189,8 +154,18 @@ class State:
 
     # Derivative function
     # input time, radius vector, velocity vector, output array w/ velocity vector, acceleration vector
-    def deriv(self, r, v, t):
+    def deriv(self, t, y):
+        r = y[:3]
+        v = y[3:]
         return np.array(v, -r/(np.linalg.norm(r)**3))
+
+    """
+    t (universal time at position) is included for the acceleration, because we have to turn the ECEF coords 
+    into GCRF coords for the derivation, and then back into ECEF for actually using the acceleration.
+    
+    so this means that we need to include, in the deriv function, the conversions
+    """
+
 
     """
     def acceleration_g(r):
@@ -231,7 +206,9 @@ class State:
     if __name__ == "__main__":
         main()
 
-
+    """
+    test using some (r, 0, 0)
+    """
 
     # Defining N(phi) in the Geodetic to ECEF conversion
     # Inputs latitude (rad), outputs...something. it's just kinda as a middleman to make things more readable
