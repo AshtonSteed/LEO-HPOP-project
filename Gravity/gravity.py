@@ -5,10 +5,12 @@ from pathlib import Path
 
 
 class Gravity:
+
+    mu = 398600.4415  #km^3 s^-2, From Pavlis et al. 2008
+    radius = 6378.1363  #km, Reference radius from EGM2008
     def __init__(self):
         self.harmonics = self.load_egm_to_numpy()
-        self.mu = 398600.4415  #km^3 s^-2, From Pavlis et al. 2008
-        self.r = 6378.1363  #km, Reference radius from EGM2008
+
 
     def load_egm_to_numpy(self, filename="EGM2008NM1000.csv"):
         """
@@ -65,10 +67,10 @@ class Gravity:
             return None
 
     def coefficients(self, n, m):
-        '''
+        """
         Helper function to return [Cnm, Snm] for a given n, m
         Probably more performant to index directly into harmonics for our summation, think before using
-        '''
+        """
         assert m <= n and m >= 0 and n >= 2  #make sure that index is valid, doesnt check for indecies above max
 
         index = (n * (n + 1)) // 2 - 3 + m  # equation for row of n, m
@@ -80,7 +82,7 @@ class Gravity:
         Calculate the gravitational potential at a given point in Earth-fixed coordinates
 
         Parameters:
-        r (float): Distance from the center of mass (CoM) in kilometers.
+        radius (float): Distance from the center of mass (CoM) in kilometers.
         theta (float): North polar angle in radians (0 to pi).
         phi (float): Angle from the prime meridian in radians (0 to 2*pi).
         nmax (int): Maximum order of terms to consider in the summation.
@@ -95,7 +97,7 @@ class Gravity:
         """
 
         # Normalize the distance with respect to the reference radius
-        rnorm = self.r / r
+        rnorm = self.radius / r
 
         # Calculate all normalized spherical Legendre polynomials up to nmax and mmax
         legendre = sp.special.sph_legendre_p_all(nmax, mmax, theta)[0]
@@ -129,7 +131,7 @@ class Gravity:
             n += (not m_increment)  # Increment n only if m reaches n or mmax
 
         # Return the potential energy, maximum order, and estimated percentage error
-        return (-self.mu / r * newu, n - 1, 100 * abs(newu - oldun) / newu)
+        return -self.mu / r * newu, n - 1, 100 * abs(newu - oldun) / newu
 
     def ellipsoid_distance(self, lat_rad, h, ao=6378.1370, f=1 / 298.257223563):
         """
@@ -143,7 +145,7 @@ class Gravity:
             f: Flattening of the ellipsoid (default: WGS84).
 
         Returns:
-            The distance r from the centroid
+            The distance radius from the centroid
         """
 
         a = ao + h
@@ -167,7 +169,7 @@ class Gravity:
         theta_grid = np.pi / 2 - lat_grid  # theta = pi/2 - latitude
         phi_grid = lon_grid  # longitude = phi
 
-        r = self.r + altitude
+        r = self.radius + altitude
 
         # Calculate potential on the grid
         potential_grid = np.zeros_like(lat_grid)
@@ -176,7 +178,7 @@ class Gravity:
             for j in range(num_points):
                 potential_grid[i, j] = self.potential(r, theta_grid[i, j], phi_grid[i, j], nmax=nmax)[0]
                 potential_rid[i, j] = self.potential(r, theta_grid[i, j], phi_grid[i, j], nmax=2)[0]
-                #potential_rid[i,j] =self.potential(r, theta_grid[i, j], phi_grid[i, j], nmax=0)[0]
+                #potential_rid[i,j] =self.potential(radius, theta_grid[i, j], phi_grid[i, j], nmax=0)[0]
 
         # Plotting
         fig, ax = plt.subplots(figsize=(10, 10), subplot_kw={'projection': 'aitoff'})
@@ -208,7 +210,7 @@ class Gravity:
         Calculate the gravitational potential at a given point in Earth-fixed coordinates
 
         Parameters:
-        r (float): Distance from the center of mass (CoM) in kilometers.
+        radius (float): Distance from the center of mass (CoM) in kilometers.
         theta (float): North polar angle in radians (0 to pi).
         phi (float): Angle from the prime meridian in radians (0 to 2*pi).
         nmax (int): Maximum order of terms to consider in the summation.
@@ -224,7 +226,7 @@ class Gravity:
         a_old = np.array([0, 0, 0], dtype=float)
 
         # Normalize the distance with respect to the reference radius
-        rnorm = self.r / r
+        rnorm = self.radius / r
 
         # Calculate all normalized spherical Legendre polynomials up to nmax and mmax
         legendrearray = sp.special.sph_legendre_p_all(nmax, mmax, theta, diff_n=1)
@@ -278,7 +280,7 @@ if __name__ == '__main__':
     #print(ag.potential(7000.1363, 100, 100, relerror=0))
     #print(ag.potential(10000.1363, 100, 100, relerror=0.0001E-2))
 
-    r = ag.r
+    r = ag.radius
     ref = -ag.mu / r
     theta_daytona = np.radians(90 - 29.218103)
     phi_daytona = np.radians(-81.031723)

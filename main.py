@@ -6,7 +6,7 @@ from Gravity.gravity import Gravity
 from Integration_and_Conversion.state import State
 
 
-    
+
 # Name of Function: state_update_full
 # Arguments / variables used:
 #   - t: Current time (unused, but required by solve_ivp signature)
@@ -14,13 +14,13 @@ from Integration_and_Conversion.state import State
 #   This function serves as the derivative function for scipy.integrate.solve_ivp, returning
 #   the derivatives of the state vector [vx, vy, vz, ax, ay, az].
 def state_update_full(t, statevec, g: Gravity):
-    
+
     # Initialize output array for derivatives [vx, vy, vz, ax, ay, az]
     output = np.zeros_like(statevec)
-    
+
     # Create a State object for convinience in coordinate conversion and data pulling
     state = State(statevec, t)
-    
+
     # Extract position and velocity vectors
     rvec = state.r()
     v = state.v()
@@ -31,18 +31,18 @@ def state_update_full(t, statevec, g: Gravity):
     (r,theta,phi) = sphr_r
     #calculate acceleration up to N=M=20
     a_s = g.acceleration_g(r, theta, phi)
-    # Convert acceleration to cartesian 
+    # Convert acceleration to cartesian
     acart = State.sphr_to_xyz_vec(sphr_r,a_s)
     #acart = State.sphr_to_xyz_point(a_s)
-    
-    
-   
+
+
+
     output[:3] = v
-    
-    
+
+
     # The last three elements of the output are the acceleration components (dv/dt = a)
     output[3:] = acart
-    
+
     return output
 
 
@@ -72,6 +72,8 @@ def state_update(t, statevec, g: Gravity):
     output[3:] = a
     
     return output
+
+
 # Name of Function: integrate
 # Arguments / variables used:
 #   - initial_state_vector: A numpy array representing the initial state vector [rx, ry, rz, vx, vy, vz].
@@ -83,8 +85,8 @@ def state_update(t, statevec, g: Gravity):
 def integrate(initial_state_vector, t_span, dt, g):
     
     # Use scipy.integrate.solve_ivp to perform the numerical integration
-    results = sp.integrate.solve_ivp(state_update_full, t_span, initial_state_vector, 
-                                     first_step=dt, rtol=1e-12, atol=1e-12, method='DOP853', args=[g])
+    results = sp.integrate.solve_ivp(state_update, t_span, initial_state_vector, 
+                                     first_step=dt, rtol=1e-9, atol=1e-9, method='DOP853', args=[g])
     return results
 
 
@@ -94,8 +96,8 @@ def main():
     g = Gravity()
     
     # Initial conditions for a 500km circular orbit
-    r_initial = np.array([g.r+500, 0, 0])  # Position vector [km]
-    v_initial = np.array([0, np.sqrt(g.mu/(g.r+500)), 0]) # Velocity vector [km/s]
+    r_initial = np.array([g.radius + 500, 0, 0])  # Position vector [km]
+    v_initial = np.array([0, np.sqrt(g.mu / (g.radius + 500)), 0]) # Velocity vector [km/s]
     t_initial = 0.0                       # Initial time [s]
 
     # Create a State object to hold initial conditions
@@ -122,7 +124,7 @@ def main():
     print("Number of saved positions: ", len(simulation_results.y[0]))
     
     # Plot the orbit
-    plot_orbit(simulation_results, g.r)
+    plot_orbit(simulation_results, g.radius)
 
 
 # Name of Function: plot_orbit

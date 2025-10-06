@@ -1,16 +1,15 @@
 import numpy as np
-#import butchertableau as bt
 from datetime import datetime, timezone
 from astropy.time import Time
 from astropy.coordinates import ITRS, GCRS
 import astropy.units as u
+from Gravity.gravity import Gravity as grav
 
 
-
-# U = -(G*M_earth)/r) + {a}
-#    sum(N_z)(n=2)[(J_n*P_n^0*sin(theta))/(r^(n+1)] + {b}
+# U = -(G*M_earth)/radius) + {a}
+#    sum(N_z)(n=2)[(J_n*P_n^0*sin(theta))/(radius^(n+1)] + {b}
 #    sum(N_t)(n=2)[sum(n)(m=1)[(P_n^m*sin(theta)* {c}
-#                              (C_n^m*cos(m*phi)+S_n^m*sin(m*phi)))/(r^(n+1))]] {d}
+#                              (C_n^m*cos(m*phi)+S_n^m*sin(m*phi)))/(radius^(n+1))]] {d}
 
 # Before you begin typing ANY code, you MUST write a comment of what you are intending to do with the function.
 # An example would be:
@@ -32,34 +31,52 @@ import astropy.units as u
 # We need to define functions for each section, so that when we combine them all, it's less of a stress on the system,
 # and is more readable for readers.
 
-# TODO: Implement other methods to load sat data, helper functions for sph. coordinates. Might be reasonable to make State as a large array rather than little objects, not sure
+# TODO: Implement other methods to load sat data,
+#  Might be reasonable to make State as a large array rather than little objects, not sure
 class State:
+
+    # Makes a list of states, we can use this to get the most recent state (such as state_list[-1])
     state_list = []
     # R: Position vector [km]
     # V: Velocity Vector [km/s]
     # t: Initial time [julian]
+
+    # conversion consts
+    A = 6378.137  # equatorial radius of the earth, km
+    B = 6356.7523142  # polar radius of the earth, km
+    Am = A * 1000  # eq radius, m
+    Bm = B * 1000  # pol radius, m
+    ECCm_2 = (Am**2 - Bm**2) / (Am**2)
+
     def __init__(self, rv, t_0):
-        self.state = rv
+        # state update vars
+        self.state = rv #HAS to be in GCRF for the integration methods
         self.t = t_0
         self.state_list.append(self.state)
-        self.a = 6378.137 #equatorial radius of the earth, km
-        self.b = 6356.7523142 #polar radius of the earth, km
-        self.am = self.a*1000 #eq radius, m
-        self.bm = self.b*1000 #pol radius, m
-        self.eccm_2 = (self.am**2-self.bm**2)/(self.am**2)
 
-    def r(self):
-        return self.state[:3]
-    
-    def v(self):
-        return self.state[3:]
-    # Makes an arrayList of states, we can use this to get the most recent state (such as state_list[-1])
+    """
+    STATE UPDATE FUNCTIONS
+    """
+    # Test using array of positions
 
+    # Runge-Kutta 4th Order (just for testing purposes)
+    def rk4(self, dt):
+        k1 = self.deriv(self.t, self.state)
+        k2 = self.deriv(self.t + 0.5 * dt, self.state + 0.5 * k1)
+        k3 = self.deriv(self.t + 0.5 * dt, self.state + 0.5 * k2)
+        k4 = self.deriv(self.t + dt, self.state + k3)
 
-    # RK8
-    # TODO: Add even higher order integration, RK8??, might be nice to move acceleration call directly into this update
-    # TODO: Change acceleration to be a function of the state, add other perturbations to acceleration()
-    def state_update(self, dt):
+        self.state = self.state + (k1 + 2 * k2 + 2 * k3 + k4) / 6
+
+        return self.state_list.append(State(self.state[:3], self.state[3:], self.t + dt))
+
+    # Runge-Kutta 8th Order
+    #
+    #     t (universal time at position) is included for the acceleration, because we have to turn the Cartesian GCRF
+    #     coords into Spherical ECEF coords for the derivation, and then back into Cartesian GCRF for actually using
+    #     the acceleration. This means that we need to include the conversions in the deriv function.
+    #
+    def rk8(self, dt):
         k_1 = self.deriv(self.t, self.state)
         k_2 = self.deriv(self.t + dt * (4 / 27), self.state + (dt * 4 / 27) * k_1)
         k_3 = self.deriv(self.t + dt * (2 / 9), self.state + (dt / 18) * (k_1 + 3 * k_2))
@@ -80,131 +97,26 @@ class State:
 
         return self.state_list.append(State(self.state[:3], self.state[3:], self.t + dt))
 
-    # Matlab Functions
-    """
-        %--------------------------------------------------------------------------
-        %
-        %  Runge-Kutta 8th Order
-        %
-        % Reference:
-        % Goddard Trajectory Determination System (GTDS): Mathematical Theory,
-        % Goddard Space Flight Center, 1989.
-        % 
-        % Last modified:   2019/04/15   Meysam Mahooti
-        % 
-        %--------------------------------------------------------------------------
-        function [y] = RK8(func, t, y, h )
-        
-        k_1 = func(t         ,y                                                                           );
-        k_2 = func(t+h*(4/27),y+(h*4/27)*k_1                                                              );
-        k_3 = func(t+h*(2/9) ,y+  (h/18)*(k_1+3*k_2)                                                      );
-        k_4 = func(t+h*(1/3) ,y+  (h/12)*(k_1+3*k_3)                                                      );
-        k_5 = func(t+h*(1/2) ,y+   (h/8)*(k_1+3*k_4)                                                      );
-        k_6 = func(t+h*(2/3) ,y+  (h/54)*(13*k_1-27*k_3+42*k_4+8*k_5)                                     );
-        k_7 = func(t+h*(1/6) ,y+(h/4320)*(389*k_1-54*k_3+966*k_4-824*k_5+243*k_6)                         );
-        k_8 = func(t+h       ,y+  (h/20)*(-234*k_1+81*k_3-1164*k_4+656*k_5-122*k_6+800*k_7)               );
-        k_9 = func(t+h*(5/6) ,y+ (h/288)*(-127*k_1+18*k_3-678*k_4+456*k_5-9*k_6+576*k_7+4*k_8)            );
-        k_10= func(t+h       ,y+(h/820)*(1481*k_1-81*k_3+7104*k_4-3376*k_5+72*k_6-5040*k_7-60*k_8+720*k_9));
-        
-        y = y + h/840*(41*k_1+27*k_4+272*k_5+27*k_6+216*k_7+216*k_9+41*k_10);
-        
-        end
-        
-        
-        % constants
-        GM    = 1;                      % gravitational coefficient
-        e     = 0.1;                    % eccentricity
-        Kep   = [1, e ,0 ,0 ,0 ,0]';    % Keplerian elements (a,e,i,Omega,omega,M)
-        
-        % header
-        fprintf( '\nRunge-Kutta 8th Order Integration\n\n' );
-        
-        % Initial state of satellite (x,y,z,vx,vy,vz)
-        y_0 = State(GM, Kep, 0);
-        
-        % step size
-        h = 0.01; % [s]
-        
-        % initial values
-        t_0 = 0; % [s]
-        t_end = 3600; % end time [s]
-        
-        Steps = t_end/h;
-        
-        tic
-        % Integration from t=t_0 to t=t_end
-        for i = 1:Steps-h
-            y = RK8(@Deriv, t_0, y_0, h);
-            y_0 = y;
-            t_0 = t_0 + h;
-        end
-        y_ref = State(GM, Kep, t_end); % Reference solution
-        
-        fprintf('Accuracy   Digits\n');
-        fprintf('%6.2e',norm(y-y_ref));
-        fprintf('%9.2f\n',-log10(norm(y-y_ref)));
-        toc
-        
-        
-        function yp = Deriv(t, y)
-
-        % State vector components
-        r = y(1:3);
-        v = y(4:6);
-        
-        % State vector derivative
-        yp = [v;-r/((norm(r))^3)];
-    """
-
-
     # Derivative function
     # input time, radius vector, velocity vector, output array w/ velocity vector, acceleration vector
     def deriv(self, t, y):
-        r = y[:3]
-        v = y[3:]
-        a = -r/(np.linalg.norm(r)**3)
-        return np.array(v, a)
+        r, v = y[:3], y[3:]
+        a_ecef = grav.acceleration_g(*self.xyz_to_sphr(self.gcrf_to_ecef(*r, t)))
+        a_gcrf = np.array(self.sphr_to_xyz(self.ecef_to_gcrf(*a_ecef, t)))
+        return np.concatenate(v, a_gcrf)
 
     """
-    t (universal time at position) is included for the acceleration, because we have to turn the ECEF coords 
-    into GCRF coords for the derivation, and then back into ECEF for actually using the acceleration.
-    
-    so this means that we need to include, in the deriv function, the conversions
+    CONVERSION FUNCTIONS
     """
-
-
-    """
-    def acceleration_g(r):
-        # TODO: Add Higher order harmonics, make into own file
-        # Calculates acceleration due to gravity assuming point mass Earth
-        mu = 398600.4418
-        r_norm = np.linalg.norm(r)
-        return -mu * r / (r_norm ** 3)
-    """
-
-    # Takes Initial state and numerically integrates with time step dt n times
-    @staticmethod
-    def integrate(old_state, dt, t):
-        # TODO: Implement a better integration method, Add Drag/ Other perturbations
-        n = int(t / dt)
-        current_state = old_state
-        for i in range(n):
-            #a = acceleration_g(current_state.r())
-            current_state = current_state.state_update(dt)
-        return current_state
-
-
-    """
-    test using some (r, 0, 0)
-    """
+    # test using some (radius, 0, 0)
 
     # Defining N(phi) in the Geodetic to ECEF conversion
     # Inputs latitude (rad), outputs...something. it's just kinda as a middleman to make things more readable
     # Maybelline Flesher
     def prime_vertical_radius(self, lat):
-        var1 = self.a**2 * np.cos(lat)**2
-        var2 = self.b**2 * np.sin(lat)**2
-        return self.a**2 / np.sqrt(var1 + var2)
+        var1 = self.A ** 2 * np.cos(lat) ** 2
+        var2 = self.B ** 2 * np.sin(lat) ** 2
+        return self.A**2 / np.sqrt(var1 + var2)
 
 
     # Geodetic to ECEF (Earth Centered, Earth Fixed)
@@ -216,7 +128,7 @@ class State:
         n_phi = self.prime_vertical_radius(lat)
         x_ecef = (n_phi + alt) * np.cos(long) * np.cos(lat)
         y_ecef = (n_phi + alt) * np.cos(long) * np.sin(lat)
-        z_ecef = ((n_phi * (self.b**2/self.a**2)) + alt)*np.sin(long)
+        z_ecef = ((n_phi * (self.B ** 2 / self.A ** 2)) + alt) * np.sin(long)
         return x_ecef, y_ecef, z_ecef
 
 
@@ -228,11 +140,11 @@ class State:
     # Jarrett Usui, Maybelline Flesher
     def ecef_to_geodetic(self, x_ecef,y_ecef,z_ecef):
         # Step 1: Prepare the initialized constants and variables
-        l = (self.am * self.eccm_2**2)**2
-        m = x_ecef**2 + y_ecef**2 #when talking about w^2, just use m for simplicity's sake
+        l = (self.Am * self.ECCm_2 ** 2) ** 2
+        m = x_ecef**2 + y_ecef**2 # when talking about w^2, just use m for simplicity's sake
         w_axis = np.sqrt(m)
         n = z_ecef**2
-        n_c = (1-self.eccm_2)*n
+        n_c = (1 - self.ECCm_2) * n
         p = m + n_c - l
         q = 27 * m * n_c * l
 
@@ -261,14 +173,14 @@ class State:
             if t > 0 or n > 0:
                 lat = m*np.sign(y_ecef) * ((np.pi / 2) - 2 * np.arctan(x_ecef / (w_axis + np.abs(y_ecef))))
                 long = 2 * np.arctan(z_ecef / (i + s))
-                alt = (w_axis * i) + n + (self.am * np.sqrt(i**2 + n_c))
+                alt = (w_axis * i) + n + (self.Am * np.sqrt(i ** 2 + n_c))
                 return lat, long, alt
 
             # Step 5: Compute Geodetic Coordinates if the following:
             if t == 0 and n == 0:
                 lat = m * np.sign(y_ecef) * ((np.pi / 2) - 2 * np.arctan(x_ecef / (w_axis + np.abs(y_ecef))))
                 long = 2 * np.arctan2(y_ecef, x_ecef)
-                alt = -1 * np.sqrt(1 - self.eccm_2)
+                alt = -1 * np.sqrt(1 - self.ECCm_2)
                 return lat, long, alt
 
         # If the variable "t" fails the isfinite() check:
@@ -292,20 +204,20 @@ class State:
         r = np.sqrt(x_ecef**2 + y_ecef**2)
 
         # Step 3: Initial guess for latitude
-        lat = np.arctan2(z_ecef, r * (1 - self.eccm_2))
+        lat = np.arctan2(z_ecef, r * (1 - self.ECCm_2))
 
         # Step 4: Iteratively refine latitude
         for _ in range(max_iter):
-            n = self.am / np.sqrt(1 - self.eccm_2 * np.sin(lat)**2)  # Radius of curvature
+            n = self.Am / np.sqrt(1 - self.ECCm_2 * np.sin(lat) ** 2)  # Radius of curvature
             alt = r / np.cos(lat) - n
-            lat_new = np.arctan2(z_ecef, r * (1 - self.eccm_2 * n / (n + alt)))
+            lat_new = np.arctan2(z_ecef, r * (1 - self.ECCm_2 * n / (n + alt)))
             if np.abs(lat_new - lat) < tol:
                 lat = lat_new
                 break
             lat = lat_new
 
         # Step 5: Final altitude calculation using latitude
-        n = self.am / np.sqrt(1 - self.eccm_2 * np.sin(lat)**2)
+        n = self.Am / np.sqrt(1 - self.ECCm_2 * np.sin(lat) ** 2)
         alt = r / np.cos(lat) - n
 
         return lat, long, alt
@@ -359,7 +271,7 @@ class State:
         return gcrs.cartesian.x.to(u.cm*100).value, gcrs.cartesian.y.to(u.cm*100).value, gcrs.cartesian.z.to(u.cm*100).value
 
 
-    def eci_to_ecef(self, x_eci, y_eci, z_eci, dt: datetime):
+    def gcrf_to_ecef(self, x_eci, y_eci, z_eci, dt: datetime):
         # Convert datetime to Astropy Time
         t = Time(dt, scale="utc")
 
@@ -394,7 +306,7 @@ class State:
         
         return output
     
-    # Convert Spherical coordinates to Cartesian [xyz] -> [r, theta, phi]
+    # Convert Spherical coordinates to Cartesian [xyz] -> [radius, theta, phi]
     @staticmethod
     def xyz_to_sphr(xyz):
         #create sphr vector
@@ -410,30 +322,30 @@ class State:
         
         sphr = r,theta,phi
         return sphr
-    
+
     def sphr_to_xyz_vec(point, vec):
         output = np.zeros(3)
-        
+
         r,theta,phi = point
         sp = np.sin(phi)
         cp = np.cos(phi)
         st = np.sin(theta)
         ct = np.cos(theta)
-        
+
         m = np.array([[st * cp, ct * cp, -sp],[st*sp,ct * sp,cp],[ct, -st, 0]])
         return np.dot(m, vec)
-        
-      
-    
-    
+
+
+
+
 
 
 if __name__ == "__main__":
     r = np.array([8000,2000,100])
-    
+
     rx = State.xyz_to_sphr(r)
-    
+
     ry = State.sphr_to_xyz(rx)
-    
-    
+
+
     print(r, rx, ry)
