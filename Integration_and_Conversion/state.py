@@ -1,10 +1,10 @@
 import numpy as np
-import butchertableau as bt
+#import butchertableau as bt
 from datetime import datetime, timezone
 from astropy.time import Time
 from astropy.coordinates import ITRS, GCRS
 import astropy.units as u
-import Gravity as g
+
 
 
 # U = -(G*M_earth)/r) + {a}
@@ -38,8 +38,8 @@ class State:
     # R: Position vector [km]
     # V: Velocity Vector [km/s]
     # t: Initial time [julian]
-    def __init__(self, r, v, t_0):
-        self.state = np.concatenate((r, v))
+    def __init__(self, rv, t_0):
+        self.state = rv
         self.t = t_0
         self.state_list.append(self.state)
         self.a = 6378.137 #equatorial radius of the earth, km
@@ -48,6 +48,11 @@ class State:
         self.bm = self.b*1000 #pol radius, m
         self.eccm_2 = (self.am**2-self.bm**2)/(self.am**2)
 
+    def r(self):
+        return self.state[:3]
+    
+    def v(self):
+        return self.state[3:]
     # Makes an arrayList of states, we can use this to get the most recent state (such as state_list[-1])
 
 
@@ -157,7 +162,8 @@ class State:
     def deriv(self, t, y):
         r = y[:3]
         v = y[3:]
-        return np.array(v, -r/(np.linalg.norm(r)**3))
+        a = -r/(np.linalg.norm(r)**3)
+        return np.array(v, a)
 
     """
     t (universal time at position) is included for the acceleration, because we have to turn the ECEF coords 
@@ -187,24 +193,6 @@ class State:
             current_state = current_state.state_update(dt)
         return current_state
 
-
-    def main(self):
-        print("Hello World 2!")
-        r = np.array([6878.0, 0, 0])
-        v = np.array([0, 7.61268, 0])
-        sat1 = State(r, v, 0)
-        time = 94.61 * 60
-        dt = 1 #seconds
-        ###
-
-        print("Start position: ", sat1.r())
-
-        sat_final = self.integrate(sat1, dt, time * 30 )
-
-        print("End Position: ", sat_final.r())
-
-    if __name__ == "__main__":
-        main()
 
     """
     test using some (r, 0, 0)
@@ -385,9 +373,9 @@ class State:
         return itrs.cartesian.x.to(u.cm*100).value, itrs.cartesian.y.to(u.cm*100).value, itrs.cartesian.z.to(u.cm*100).value
 
 
-    # Convert spherical vector to cartesian coordinate vector [r,theta,phi] -> [x,y,z]
+    # Convert position spherical vector to cartesian coordinate vector [r,theta,phi] -> [x,y,z]
     @staticmethod
-    def sphr_to_xyz(sphr):
+    def sphr_to_xyz_point(sphr):
         output = np.zeros(3)
         
         #unpack spherical cords
@@ -415,6 +403,7 @@ class State:
         #unpack xyz
         (x,y,z) = xyz
         
+        #Calculate Spherical Coordinates
         r = np.linalg.norm(xyz)
         phi = np.atan2(y,x)
         theta = np.acos(z/r)
@@ -422,3 +411,29 @@ class State:
         sphr = r,theta,phi
         return sphr
     
+    def sphr_to_xyz_vec(point, vec):
+        output = np.zeros(3)
+        
+        r,theta,phi = point
+        sp = np.sin(phi)
+        cp = np.cos(phi)
+        st = np.sin(theta)
+        ct = np.cos(theta)
+        
+        m = np.array([[st * cp, ct * cp, -sp],[st*sp,ct * sp,cp],[ct, -st, 0]])
+        return np.dot(m, vec)
+        
+      
+    
+    
+
+
+if __name__ == "__main__":
+    r = np.array([8000,2000,100])
+    
+    rx = State.xyz_to_sphr(r)
+    
+    ry = State.sphr_to_xyz(rx)
+    
+    
+    print(r, rx, ry)

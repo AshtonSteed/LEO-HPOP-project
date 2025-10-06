@@ -220,8 +220,8 @@ class Gravity:
         """
 
         #initialize acceleration vector and approximate acceleration vector
-        a = np.array([1, 0, 0], dtype=float)  # 1 is main radial acceleration term
-        a_old = np.array([1, 0, 0], dtype=float)
+        a = np.array([0, 0, 0], dtype=float)  # 1 is main radial acceleration term
+        a_old = np.array([0, 0, 0], dtype=float)
 
         # Normalize the distance with respect to the reference radius
         rnorm = self.r / r
@@ -267,8 +267,9 @@ class Gravity:
 
         #vector of scaler terms and radial base
         scalars = np.array([-self.mu / (r ** 2), self.mu / (r ** 2), -self.mu / (r ** 2 * np.sin(theta))])
+        
         # Return the acceleration vector
-        return a * scalars
+        return (a + np.array([1,0,0])) * scalars
 
 
 if __name__ == '__main__':

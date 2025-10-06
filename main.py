@@ -3,29 +3,50 @@ import pandas as pd
 import scipy as sp 
 import matplotlib.pyplot as plt
 from Gravity.gravity import Gravity
-
-
-#TODO: Implement other methods to load sat data, helper functions for sph. coordinates. 
-class State:
-    # R: Position vector [km] ECI
-    # V: Velocity Vector [km/s] ECI
-    # t: Initial time [s]
-    def __init__(self, rv, t):
-        # The state vector for solve_ivp is [rx, ry, rz, vx, vy, vz]
-        self.state = rv
-        self.t = t
-
-    # Helper Function to return position vector from the state array
-    def r(self):
-        return self.state[:3]
-
-    # Helper Function to return velocity vector from the state array
-    def v(self):
-        return self.state[3:]
+from Integration_and_Conversion.state import State
 
 
     
-# Name of Function: acceleration_g
+# Name of Function: state_update_full
+# Arguments / variables used:
+#   - t: Current time (unused, but required by solve_ivp signature)
+#   - statevec: A numpy array representing the current state vector [rx, ry, rz, vx, vy, vz]
+#   This function serves as the derivative function for scipy.integrate.solve_ivp, returning
+#   the derivatives of the state vector [vx, vy, vz, ax, ay, az].
+def state_update_full(t, statevec, g: Gravity):
+    
+    # Initialize output array for derivatives [vx, vy, vz, ax, ay, az]
+    output = np.zeros_like(statevec)
+    
+    # Create a State object for convinience in coordinate conversion and data pulling
+    state = State(statevec, t)
+    
+    # Extract position and velocity vectors
+    rvec = state.r()
+    v = state.v()
+
+    #Calculate Spherical position vector
+    #TODO: account for GCRF->ECEF Spherical
+    sphr_r = State.xyz_to_sphr(rvec)
+    (r,theta,phi) = sphr_r
+    #calculate acceleration up to N=M=20
+    a_s = g.acceleration_g(r, theta, phi)
+    # Convert acceleration to cartesian 
+    acart = State.sphr_to_xyz_vec(sphr_r,a_s)
+    #acart = State.sphr_to_xyz_point(a_s)
+    
+    
+   
+    output[:3] = v
+    
+    
+    # The last three elements of the output are the acceleration components (dv/dt = a)
+    output[3:] = acart
+    
+    return output
+
+
+# Name of Function: state_update_full
 # Arguments / variables used:
 #   - t: Current time (unused, but required by solve_ivp signature)
 #   - statevec: A numpy array representing the current state vector [rx, ry, rz, vx, vy, vz]
@@ -46,22 +67,11 @@ def state_update(t, statevec, g: Gravity):
     # Calculate the norm (magnitude) of the position vector
     r_norm = np.linalg.norm(r)
     a = -g.mu * r / (r_norm**3) # Point mass earth acceleration
-    
-    #temp shpr coords
-    
-    theta = np.acos(r[2]/r_norm)
-    phi = np.atan(r[1]/r[0])
-    a_s = g.acceleration_g(r_norm, theta, phi)
-    #a = a_s[0] * np.array([np.cos(theta) * np.cos(a_s[2]), np.cos(theta) * np.sin(a_s[2]), np.sin(a_s[1])]) 
-    # The first three elements of the output are the velocity components (dr/dt = v)
     output[:3] = v
-    
-    
     # The last three elements of the output are the acceleration components (dv/dt = a)
     output[3:] = a
     
     return output
-
 # Name of Function: integrate
 # Arguments / variables used:
 #   - initial_state_vector: A numpy array representing the initial state vector [rx, ry, rz, vx, vy, vz].
@@ -73,8 +83,8 @@ def state_update(t, statevec, g: Gravity):
 def integrate(initial_state_vector, t_span, dt, g):
     
     # Use scipy.integrate.solve_ivp to perform the numerical integration
-    results = sp.integrate.solve_ivp(state_update, t_span, initial_state_vector, 
-                                     first_step=dt, rtol=1e-9, atol=1e-9, method='DOP853', args=[g])
+    results = sp.integrate.solve_ivp(state_update_full, t_span, initial_state_vector, 
+                                     first_step=dt, rtol=1e-12, atol=1e-12, method='DOP853', args=[g])
     return results
 
 
