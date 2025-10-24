@@ -53,7 +53,14 @@ class State:
         self.state = rv #HAS to be in GCRF for the integration methods
         self.t = t_0
         self.state_list.append(self.state)
-
+        
+    """Utility Functions"""
+    # Get position vector
+    def r(self):
+        return self.state[:3]
+    # Get velocity vector
+    def v(self):    
+        return self.state[3:]
     """
     STATE UPDATE FUNCTIONS
     """
@@ -95,7 +102,7 @@ class State:
         self.state = self.state + dt / 840 * (41 * k_1 + 27 * k_4 + 272 * k_5 + 27 * k_6 + 216 * k_7 + 216 * k_9 + 41
                                               * k_10)
 
-        return self.state_list.append(State(self.state[:3], self.state[3:], self.t + dt))
+        return self.state_list.append(State(self.r(), self.v(), self.t + dt))
 
     # Derivative function
     # input time, radius vector, velocity vector, output array w/ velocity vector, acceleration vector
@@ -323,8 +330,8 @@ class State:
         sphr = r,theta,phi
         return sphr
 
+    @staticmethod
     def sphr_to_xyz_vec(point, vec):
-        output = np.zeros(3)
 
         r,theta,phi = point
         sp = np.sin(phi)
