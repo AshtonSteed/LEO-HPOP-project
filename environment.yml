@@ -1,0 +1,14 @@
+name: leo_env
+channels:
+  - defaults
+dependencies:
+  - numpy
+  - matplotlib
+  - pandas
+  - numexpr
+  - scipy
+  - pathlib
+  - astropy
+  - seaborn
+  - tqdm
+  - fortran-compiler
