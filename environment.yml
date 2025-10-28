@@ -2,14 +2,17 @@ name: leo_env
 channels:
   - defaults
 dependencies:
-  - numpy
   - matplotlib
+  - numpy
   - pandas
   - numexpr
+  - tqdm
   - scipy
   - pathlib
-  - astropy
-  - seaborn
-  - tqdm
   - fortran-compiler
   - numba
+  - seaborn
+  - astropy
+  - numba-scipy
+pip:
+  - pyatmos

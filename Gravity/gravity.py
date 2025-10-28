@@ -204,7 +204,7 @@ class Gravity:
 
         plt.show()
 
-    #TODO make a function that returns a vector [ar, atheta, aphi] in Fixed Geocentric coordinates.
+    #TODO Vectorize this function instead of python loop
     def acceleration_g(self, r, theta, phi, nmax=20, mmax=20, relerror=0E-2):
         """
         Calculate the gravitational potential at a given point in Earth-fixed coordinates
@@ -257,7 +257,7 @@ class Gravity:
 
             #Phi Acceleration
             a[2] += m * rnorm ** n * legendre[n, m] * (
-                        self.harmonics[i, 1] * np.cos(m * phi) - self.harmonics[i, 0] * np.cos(m * phi))
+                        self.harmonics[i, 1] * np.cos(m * phi) - self.harmonics[i, 0] * np.sin(m * phi))
 
             # Increment the index for harmonics
             i += 1
