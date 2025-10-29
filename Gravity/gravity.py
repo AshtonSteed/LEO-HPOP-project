@@ -213,6 +213,10 @@ class Gravity:
     def acceleration_g(self, r, theta, phi, nmax=20, relerror=0E-2):
         
         
+        # Handle case where nmax < N_start (e.g., nmax=1 but N_start=2)
+        if nmax < 2: # Assuming your N_start is 2
+            return np.array([-self.mu / (r ** 2), 0, 0])
+        
         # initialize acceleration vector in spherical coordinates
         a = np.array([0, 0, 0], dtype=float) 
         

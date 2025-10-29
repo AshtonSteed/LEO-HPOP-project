@@ -120,7 +120,7 @@ def main():
     print("Initial velocity: ", initial_satellite_state.v())
 
     # List of N-M values to test (assuming N=M for simplicity, as per gravity model)
-    n_values = [0,0,2, 5, 10, 20]  # Different maximum degrees
+    n_values = [0,0,2, 5, 10, 20,50,100,200, 250]  # Different maximum degrees
 
     results = {}
 
