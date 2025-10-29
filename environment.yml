@@ -9,10 +9,9 @@ dependencies:
   - tqdm
   - scipy
   - pathlib
-  - fortran-compiler
   - numba
   - seaborn
   - astropy
-  - numba-scipy
+  - pyshtools
 pip:
   - pyatmos

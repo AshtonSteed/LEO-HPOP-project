@@ -2,14 +2,20 @@ import numpy as np
 import scipy as sp
 import matplotlib.pyplot as plt
 from pathlib import Path
-
+import time
+import pyshtools as pysh
 
 class Gravity:
 
     mu = 398600.4415  #km^3 s^-2, From Pavlis et al. 2008
     radius = 6378.1363  #km, Reference radius from EGM2008
     def __init__(self):
-        self.harmonics = self.load_egm_to_numpy()
+        harmonicdata = self.load_egm_to_numpy()
+        
+        self.harmonics = harmonicdata[:,2:]
+        self.nlist = harmonicdata[:, 0].astype(int)
+        self.mlist = harmonicdata[:, 1].astype(int)
+
 
 
     def load_egm_to_numpy(self, filename="EGM2008NM1000.csv"):
@@ -52,7 +58,7 @@ class Gravity:
                     4: d_to_e,  # Apply to column Cerr (index 4)
                     5: d_to_e  # Apply to column Serr (index 5)
                 },
-                usecols=(2, 3),  # only return C and S, errors and indecies arent needed
+                usecols=(0,1, 2, 3),  # only return C and S, errors and indecies arent needed
                 encoding='utf-8'  # Explicitly set encoding, helpful for unexpected characters
 
             )
@@ -204,76 +210,75 @@ class Gravity:
 
         plt.show()
 
-    #TODO Vectorize this function instead of python loop
-    def acceleration_g(self, r, theta, phi, nmax=20, mmax=20, relerror=0E-2):
-        """
-        Calculate the gravitational potential at a given point in Earth-fixed coordinates
-
-        Parameters:
-        radius (float): Distance from the center of mass (CoM) in kilometers.
-        theta (float): North polar angle in radians (0 to pi).
-        phi (float): Angle from the prime meridian in radians (0 to 2*pi).
-        nmax (int): Maximum order of terms to consider in the summation.
-        mmax (int): Maximum degree of terms to consider in the summation.
-        relerror (float): Maximum relative error acceptable. If 0, only nmax and mmax are used.
-
-        Returns:
-        A spherical acceleration vector with terms [ar, atheta, aphi]
-        """
-
-        #initialize acceleration vector and approximate acceleration vector
-        a = np.array([0, 0, 0], dtype=float)  # 1 is main radial acceleration term
-        a_old = np.array([0, 0, 0], dtype=float)
-
-        # Normalize the distance with respect to the reference radius
+    def acceleration_g(self, r, theta, phi, nmax=20, relerror=0E-2):
+        
+        
+        # initialize acceleration vector in spherical coordinates
+        a = np.array([0, 0, 0], dtype=float) 
+        
+        #Determine appropriate N, M vectors from maximum values
+        
+        maxindex =  round((nmax**2 + nmax - 6)/2 + nmax )# Total number of terms from n=2 to nmax, m=0 to m=n
+        n = self.nlist[:maxindex + 1]
+        m = self.mlist[:maxindex + 1]
+        
+        
+        #Calculate normalized Radius
         rnorm = self.radius / r
+        
+        #COMMON radial term
+        r_n = rnorm ** n
+        
+        # 1. Calculate z = cos(theta)
+        z = np.cos(theta)
 
-        # Calculate all normalized spherical Legendre polynomials up to nmax and mmax
-        legendrearray = sp.special.sph_legendre_p_all(nmax, mmax, theta, diff_n=1)
-        #Assign slices of legendre polynomials to values and derivatives
-        # legendre[n, m] represents P(cos(theta)), where n is the order and m is the degree
-        legendre = legendrearray[0]
-        # Same for derivatives, but d(P(cos(theta)))/(d theta) of n,m
-        legendrederiv = legendrearray[1]
+        # 2. Compute the FULL 1D packed arrays for values and derivatives
+        #Use pyshtools to compute the associated Legendre polynomials and their derivatives, maintains accuracy for high n,m
+        # 'nmax' is 'lmax' in pyshtools terminology
+        legendre, legendre_deriv = pysh.legendre.PlmON_d1(nmax, z, csphase=1)
+        #trim first few terms
+        legendre = legendre[3:]
+        legendre_deriv = legendre_deriv[3:]
+        
+            
 
-        # Initialize indices for the summation
-        n = 2  # Starting order
-        m = 0  # Starting degree
-        i = 0  # Index for accessing harmonics
-
-        # Iterate until the relative error is within the acceptable limit or n reaches nmax
-        while n <= nmax:
-            if m == 0:
-                a_old = a
-            # Add next term for each acceleration component
-
-            #Radial Acceleration
-            a[0] += (n + 1) * rnorm ** n * legendre[n, m] * (
-                        self.harmonics[i, 0] * np.cos(m * phi) + self.harmonics[i, 1] * np.sin(m * phi))
-
-            #Theta Acceleration
-            a[1] += rnorm ** n * legendrederiv[n, m] * (
-                        self.harmonics[i, 0] * np.cos(m * phi) + self.harmonics[i, 1] * np.sin(m * phi))
-
-            #Phi Acceleration
-            a[2] += m * rnorm ** n * legendre[n, m] * (
-                        self.harmonics[i, 1] * np.cos(m * phi) - self.harmonics[i, 0] * np.sin(m * phi))
-
-            # Increment the index for harmonics
-            i += 1
-
-            # Determine whether to increment m or n
-            m_increment = (m < n) and m < mmax  # Boolean flag to control incrementing m or n
-            m = (m + m_increment) * (1 - (not m_increment))  # Increment m or reset to 0
-            n += (not m_increment)  # Increment n only if m reaches n or mmax
-
-        #vector of scaler terms and radial base
+        
+        #Angular Terms
+        m_phi = m*phi
+        cos_m_phi = np.cos(m_phi)
+        sin_m_phi = np.sin(m_phi)
+        
+        # Harmonic Coefficients from gravitational model
+        c_nm = self.harmonics[:maxindex + 1,0]
+        s_nm = self.harmonics[:maxindex + 1, 1]
+        
+        #common and phi term
+        common_phi = c_nm * cos_m_phi + s_nm * sin_m_phi
+        phi_deriv = s_nm * cos_m_phi - c_nm * sin_m_phi
+        
+        #Radial Acceleration
+        #Radial Coefficient
+        r_coef = (n + 1) * r_n * legendre * common_phi
+        
+        #Theta Acceleration
+        a_coef = r_n * legendre_deriv * common_phi
+        
+        #Phi Acceleration
+        phi_coef = m * r_n * legendre * phi_deriv
+        
+        # 7. Sum all terms to get the final values for a[0], a[1], a[2]
+        a[0] = np.sum(r_coef)
+        a[1] = np.sum(a_coef)
+        a[2] = np.sum(phi_coef)
+        
+        # 8. Apply final scaling and N=0 term (the [1,0,0] part)
         scalars = np.array([-self.mu / (r ** 2), self.mu / (r ** 2), -self.mu / (r ** 2 * np.sin(theta))])
         
-        # Return the acceleration vector
-        return (a + np.array([1,0,0])) * scalars
+        # Add the N=0 term [1,0,0] to the N=2+ sum before scaling
+        return (a + np.array([1, 0, 0])) * scalars
+        
 
-
+        
 if __name__ == '__main__':
     ag = Gravity()
     #print(ag.coefficients(207, 1))
@@ -284,8 +289,8 @@ if __name__ == '__main__':
     ref = -ag.mu / r
     theta_daytona = np.radians(90 - 29.218103)
     phi_daytona = np.radians(-81.031723)
-
-    print(ag.acceleration_g(r, theta_daytona, phi_daytona))
+    print(ag.acceleration_g(r, theta_daytona, phi_daytona,nmax=1000))
+   
 
     #theta = np.linspace(0,np.pi, 100)
 
