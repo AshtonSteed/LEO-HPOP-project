@@ -1,17 +1,18 @@
 name: leo_env
 channels:
   - defaults
+  - conda-forge
 dependencies:
   - matplotlib
   - numpy
-  - pandas
   - numexpr
   - tqdm
   - scipy
   - pathlib
   - numba
-  - seaborn
   - astropy
+  - skyfield
   - pyshtools
-pip:
-  - pyatmos
+  - pip
+  - pip:
+     - pyatmos

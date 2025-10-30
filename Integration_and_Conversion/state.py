@@ -4,6 +4,8 @@ from astropy.time import Time
 from astropy.coordinates import ITRS, GCRS
 import astropy.units as u
 from Gravity.gravity import Gravity as grav
+from skyfield.framelib import itrs
+from skyfield.functions import T
 
 
 # U = -(G*M_earth)/radius) + {a}
@@ -276,6 +278,32 @@ class State:
 
         # Return as X, Y, Z
         return gcrs.cartesian.x.to(u.cm*100).value, gcrs.cartesian.y.to(u.cm*100).value, gcrs.cartesian.z.to(u.cm*100).value
+
+    # ICRS to ITRS (ECEF)
+    # Input as X, Y, Z coordinates (float) (inertial frame), and output as X, Y, Z
+    #   coordinates (float) (non-inertial frame)
+    # Same as above, useing skyfield instead of astropy for some more efficiency
+    # t is datetime in TBD seconds, ts is a skyfield timescale object
+    @staticmethod
+    def icrs_to_itrs(r_eci, t, ts):
+        #
+        t_obj = ts.tdb(jd=t/86400) # Convert seconds to days for skyfield
+        R = itrs.rotation_at(t_obj) # Find Rotation between ICRS and ITRS at t
+        r_itrs = R @ r_eci # Rotate vector into ITRS
+        return r_itrs
+    
+    # ITRS to ICRS 
+    # Input as X, Y, Z coordinates (float) (non-inertial frame), and output as X, Y, Z
+    #   coordinates (float) (inertial frame)
+    # Same as nelow, useing skyfield instead of astropy for some more efficiency
+    # t is datetime in JD float, ts is a skyfield timescale object
+    @staticmethod
+    def itrs_to_icrs(r_ecef, t, ts):
+        t_obj = ts.tdb(jd=t/86400) # Convert seconds to days for skyfield
+        R = itrs.rotation_at(t_obj) # Find Rotation between ICRS and ITRS at t
+        R_T = T(R) # Invert rotation matrix, ITRS to ICRS
+        r_icrs = R_T @ r_ecef  # Rotate vector into ICRS
+        return r_icrs
 
 
     def gcrf_to_ecef(self, x_eci, y_eci, z_eci, dt: datetime):

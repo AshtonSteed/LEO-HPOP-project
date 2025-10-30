@@ -1,10 +1,10 @@
 import numpy as np
-import pandas as pd
 import scipy as sp
 import matplotlib.pyplot as plt
 import time
 from Gravity.gravity import Gravity
 from Integration_and_Conversion.state import State
+import skyfield.api as sf
 
 
 
@@ -53,7 +53,7 @@ def state_update_full(t, statevec, g: Gravity):
 #   - statevec: A numpy array representing the current state vector [rx, ry, rz, vx, vy, vz]
 #   This function serves as the derivative function for scipy.integrate.solve_ivp, returning
 #   the derivatives of the state vector [vx, vy, vz, ax, ay, az].
-def state_update(t, statevec, g: Gravity, n=0):
+def state_update(t, statevec, g: Gravity, ts: sf.Timescale, n=0):
     
     # Initialize output array for derivatives [vx, vy, vz, ax, ay, az]
     output = np.zeros_like(statevec)
@@ -66,9 +66,13 @@ def state_update(t, statevec, g: Gravity, n=0):
     v = state.v()
 
     # Calculate the norm (magnitude) of the position vector
-    r_norm,theta,phi = state.xyz_to_sphr(r)
+    xyz_itrs = State.icrs_to_itrs(r, t, ts)
+    r_norm,theta,phi = state.xyz_to_sphr(xyz_itrs)
     a_sphr = g.acceleration_g(r_norm, theta, phi, nmax=n)
-    a = State.sphr_to_xyz_vec((r_norm,theta,phi),a_sphr)
+    a_itrs = State.sphr_to_xyz_vec((r_norm,theta,phi),a_sphr)
+    #Now convert acceleration to ICRS frame
+    
+    a = State.itrs_to_icrs(a_itrs, t, ts)
     
     output[:3] = v
     # The last three elements of the output are the acceleration components (dv/dt = a)
@@ -86,11 +90,11 @@ def state_update(t, statevec, g: Gravity, n=0):
 # What the intention of the function is:
 #   This function numerically integrates the equations of motion using scipy.integrate.solve_ivp.
 #   It takes an initial state vector and a time span, and returns the results of the integration.
-def integrate(initial_state_vector, t_span, dt, g, n):
+def integrate(initial_state_vector, t_span, dt, g, ts, n):
 
     # Use scipy.integrate.solve_ivp to perform the numerical integration
     results = sp.integrate.solve_ivp(state_update, t_span, initial_state_vector,
-                                     first_step=dt, rtol=1e-9, atol=1e-9, method='DOP853', args=[g, n])
+                                     first_step=dt, rtol=1e-12, atol=1e-12, method='DOP853', args=[g, ts, n])
     return results
 
 
@@ -98,29 +102,39 @@ def main():
     print("Starting orbital simulation accuracy comparison...")
 
     g = Gravity()
+    ts = sf.load.timescale()
 
-    # Initial conditions for a 500km circular orbit
+    # Initial conditions for a 500km circular orbit in ICRS
     r_initial = np.array([g.radius + 500, 0, 0])  # Position vector [km]
-    v_initial = np.array([0, np.sqrt(g.mu / (g.radius + 500)), 0]) # Velocity vector [km/s]
-    t_initial = 0.0                       # Initial time [s]
-
+    v_initial = np.array([0, 0, np.sqrt(g.mu / (g.radius + 500))]) # Velocity vector [km/s]
+    
+    #Define start and end times in UTC
+    t_start_utc = ts.utc(2022, 1, 1, 0, 0, 0)
+    t_end_utc = ts.utc(2022, 1, 5, 0, 0)
+    #Convert to Julian Date "Physics ready" time
+    t_start_db = t_start_utc.tdb * 86400  # Convert days to seconds
+    t_end_db = t_end_utc.tdb * 86400      # Convert days to seconds
+    
+    #print(f"Simulation start time (TDB): {t_start_db}")
+    #print(f"Simulation end time (TDB): {t_end_db}")
+    
     # Create a State object to hold initial conditions
-    initial_satellite_state = State(np.concatenate((r_initial, v_initial)), t_initial)
+    initial_satellite_state = State(np.concatenate((r_initial, v_initial)), t_start_db)
 
     # Define simulation parameters
     orbital_period = np.sqrt(4 * np.pi**2 * np.linalg.norm(r_initial)**3 / g.mu) # seconds for one orbit
     print(f"Orbital period: {orbital_period} seconds")
-    simulation_duration = orbital_period * 5  # Simulate for 1 orbit for comparison
+
     time_step = 1               # Initial step size for the solver [s]
 
     # Define the time span for integration (from t_initial to simulation_duration)
-    t_span = (t_initial, simulation_duration)
+    t_span = (t_start_db, t_end_db)
 
     print("Initial position: ", initial_satellite_state.r())
     print("Initial velocity: ", initial_satellite_state.v())
 
     # List of N-M values to test (assuming N=M for simplicity, as per gravity model)
-    n_values = [0,0,2, 5, 10, 20,50,100,200, 250]  # Different maximum degrees
+    n_values = [4, 8]  # Different maximum degrees
 
     results = {}
 
@@ -129,13 +143,14 @@ def main():
         start_time = time.time()
 
         # Integrate the equations of motion
-        simulation_results = integrate(initial_satellite_state.state, t_span, time_step, g, n)
+        simulation_results = integrate(initial_satellite_state.state, t_span, time_step, g, ts, n)
 
         end_time = time.time()
         elapsed_time = end_time - start_time
 
         # Store final position for later error calculation
         final_position = simulation_results.y[:3, -1]
+        plot_orbit(simulation_results, g.radius)
 
         # Log results
         results[n] = {
@@ -161,6 +176,7 @@ def main():
     print("-" * 40)
     for n, data in results.items():
         print(f"{n:3d} | {data['time']:8.2f} | {data['position_error']:17.6f} | {data['num_steps']:5d}")
+        
 
     # Optionally plot the orbit for the highest accuracy (highest N)
     # plot_orbit(simulation_results, g.radius)
