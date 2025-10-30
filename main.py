@@ -8,43 +8,6 @@ import skyfield.api as sf
 
 
 
-# Name of Function: state_update_full
-# Arguments / variables used:
-#   - t: Current time (unused, but required by solve_ivp signature)
-#   - statevec: A numpy array representing the current state vector [rx, ry, rz, vx, vy, vz]
-#   This function serves as the derivative function for scipy.integrate.solve_ivp, returning
-#   the derivatives of the state vector [vx, vy, vz, ax, ay, az].
-def state_update_full(t, statevec, g: Gravity):
-
-    # Initialize output array for derivatives [vx, vy, vz, ax, ay, az]
-    output = np.zeros_like(statevec)
-
-    # Create a State object for convinience in coordinate conversion and data pulling
-    state = State(statevec, t)
-
-    # Extract position and velocity vectors
-    rvec = state.r()
-    v = state.v()
-
-    #Calculate Spherical position vector
-    #TODO: account for GCRF->ECEF Spherical
-    sphr_r = State.xyz_to_sphr(rvec)
-    (r,theta,phi) = sphr_r
-    #calculate acceleration up to N=M=20
-    a_s = g.acceleration_g(r, theta, phi)
-    # Convert acceleration to cartesian
-    acart = State.sphr_to_xyz_vec(sphr_r,a_s)
-    #acart = State.sphr_to_xyz_point(a_s)
-
-
-
-    output[:3] = v
-
-
-    # The last three elements of the output are the acceleration components (dv/dt = a)
-    output[3:] = acart
-
-    return output
 
 
 # Name of Function: state_update_full
@@ -65,13 +28,15 @@ def state_update(t, statevec, g: Gravity, ts: sf.Timescale, n=0):
     r = state.r()
     v = state.v()
 
-    # Calculate the norm (magnitude) of the position vector
+    # Convert position to ITRS frame to compute acceleration due to gravity
     xyz_itrs = State.icrs_to_itrs(r, t, ts)
+    # Find spherical coordinates from Cartesian
     r_norm,theta,phi = state.xyz_to_sphr(xyz_itrs)
+    # Compute gravitational acceleration in spherical coordinates
     a_sphr = g.acceleration_g(r_norm, theta, phi, nmax=n)
+    # Convert acceleration back Cartesian ITRS frame
     a_itrs = State.sphr_to_xyz_vec((r_norm,theta,phi),a_sphr)
     #Now convert acceleration to ICRS frame
-    
     a = State.itrs_to_icrs(a_itrs, t, ts)
     
     output[:3] = v
@@ -150,7 +115,7 @@ def main():
 
         # Store final position for later error calculation
         final_position = simulation_results.y[:3, -1]
-        plot_orbit(simulation_results, g.radius)
+        #lot_orbit(simulation_results, g.radius)
 
         # Log results
         results[n] = {
