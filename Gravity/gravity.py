@@ -139,6 +139,81 @@ class Gravity:
         # Return the potential energy, maximum order, and estimated percentage error
         return -self.mu / r * newu, n - 1, 100 * abs(newu - oldun) / newu
 
+    def potential_vec(self, r, theta, phi, nmax=200):
+        """
+        Calculates the gravitational potential at a given point using a vectorized approach.
+
+        This function is designed to be consistent with the vectorized 'acceleration_g'
+        by using 1D packed arrays and NumPy operations.
+
+        Parameters:
+        r (float): Distance from the center of mass (CoM) in kilometers.
+        theta (float): North polar angle in radians (0 to pi).
+        phi (float): Angle from the prime meridian in radians (0 to 2*pi).
+        nmax (int): Maximum degree (N) of terms to consider in the summation.
+
+        Returns:
+        tuple: A tuple containing:
+            - Potential energy at the point in km^2/s^2 or MJ/kg.
+            - Maximum degree (nmax) of terms considered.
+            - Estimated percentage error (returns 0.0, as relerror is not used).
+        """
+        
+        # Handle case for N=0 or N=1 (spherical gravity only)
+        if nmax < 2:
+            # Return N=0 potential, max order, and error
+            return -self.mu / r, 0, 0.0
+
+        # --- 1. Get Array Indices (mirroring acceleration_g) ---
+        # Determine total number of terms from n=2 to nmax, m=0 to m=n
+        maxindex = round((nmax**2 + nmax - 6)/2 + nmax)
+        n = self.nlist[:maxindex + 1] # 1D array of 'n' values
+        m = self.mlist[:maxindex + 1] # 1D array of 'm' values
+
+        # --- 2. Calculate Common Terms ---
+        rnorm = self.radius / r
+        z = np.cos(theta)
+        
+        # --- 3. Compute All Terms in Vectors ---
+        
+        # Radial Term (R_e / r)^n
+        r_n = rnorm ** n
+
+        # Legendre Polynomials P_nm(cos(theta))
+        # Use PlmON to match the 'orthonormalized' 'ON' in acceleration_g's PlmON_d1
+        # and 'csphase=1' to be consistent.
+        legendre = pysh.legendre.PlmBar(nmax, z, csphase=1)
+        legendre = legendre[3:] # Trim first 3 terms (n=0,0), (n=1,0), (n=1,1)
+
+        # Angular Terms
+        m_phi = m * phi
+        cos_m_phi = np.cos(m_phi)
+        sin_m_phi = np.sin(m_phi)
+
+        # Harmonic Coefficients C_nm and S_nm
+        c_nm = self.harmonics[:maxindex + 1, 0]
+        s_nm = self.harmonics[:maxindex + 1, 1]
+
+        # Common Term (C_nm * cos(m*phi) + S_nm * sin(m*phi))
+        common_phi = c_nm * cos_m_phi + s_nm * sin_m_phi
+
+        # --- 4. Calculate Potential Sum ---
+        
+        # Full summation term: (R_e/r)^n * P_nm * (Common_Term)
+        all_potential_terms = r_n * legendre * common_phi
+        
+        # Sum all N=2+ terms
+        potential_sum = np.sum(all_potential_terms)
+        
+        # Add the N=0 term (which is 1)
+        # U = 1 + sum(all_potential_terms)
+        newu = 1 + potential_sum
+
+        # --- 5. Return Final Potential ---
+        # V = -(mu/r) * U
+        V = -self.mu / r * newu
+
+        return V, nmax, 0.0 # Return 0.0 for error, as relerror check was removed
     def ellipsoid_distance(self, lat_rad, h, ao=6378.1370, f=1 / 298.257223563):
         """
         Helper function to converts geodetic point coordinates (latitude, longitude, height) to
@@ -182,8 +257,8 @@ class Gravity:
         potential_rid = np.zeros_like(lat_grid)
         for i in range(num_points):
             for j in range(num_points):
-                potential_grid[i, j] = self.potential(r, theta_grid[i, j], phi_grid[i, j], nmax=nmax)[0]
-                potential_rid[i, j] = self.potential(r, theta_grid[i, j], phi_grid[i, j], nmax=2)[0]
+                potential_grid[i, j] = self.potential_vec(r, theta_grid[i, j], phi_grid[i, j], nmax=nmax)[0]
+                potential_rid[i, j] = self.potential_vec(r, theta_grid[i, j], phi_grid[i, j], nmax=2)[0]
                 #potential_rid[i,j] =self.potential(radius, theta_grid[i, j], phi_grid[i, j], nmax=0)[0]
 
         # Plotting
@@ -239,10 +314,10 @@ class Gravity:
         # 2. Compute the FULL 1D packed arrays for values and derivatives
         #Use pyshtools to compute the associated Legendre polynomials and their derivatives, maintains accuracy for high n,m
         # 'nmax' is 'lmax' in pyshtools terminology
-        legendre, legendre_deriv = pysh.legendre.PlmON_d1(nmax, z, csphase=1)
+        legendre, legendre_deriv = pysh.legendre.PlmBar_d1(nmax, z, csphase=1)
         #trim first few terms
         legendre = legendre[3:]
-        legendre_deriv = legendre_deriv[3:]
+        legendre_deriv = legendre_deriv[3:] * - np.sin(theta)
         
             
 
@@ -270,10 +345,24 @@ class Gravity:
         #Phi Acceleration
         phi_coef = m * r_n * legendre * phi_deriv
         
+        
+        
         # 7. Sum all terms to get the final values for a[0], a[1], a[2]
         a[0] = np.sum(r_coef)
         a[1] = np.sum(a_coef)
         a[2] = np.sum(phi_coef)
+        
+        if not np.all(np.isfinite(a_coef)):
+            print("\n" + "="*40)
+            print(f"🚨 BAD VALUE DETECTED! 🚨")
+            print(f"         N, M: {nmax}")
+            print(f"Input Position: {r} {theta} {phi}")
+            print(f"  Output Accel: {a}")
+            print("="*40 + "\n")
+        
+        # You can even raise an error to stop the integrator
+        # raise ValueError(f"NaN or Inf detected at N={current_N}")
+    # ----------------------------------------------------
         
         # 8. Apply final scaling and N=0 term (the [1,0,0] part)
         scalars = np.array([-self.mu / (r ** 2), self.mu / (r ** 2), -self.mu / (r ** 2 * np.sin(theta))])
@@ -294,6 +383,12 @@ if __name__ == '__main__':
     theta_daytona = np.radians(90 - 29.218103)
     phi_daytona = np.radians(-81.031723)
     print(ag.acceleration_g(r, theta_daytona, phi_daytona,nmax=1000))
+    print(ag.acceleration_g(r, theta_daytona, phi_daytona,nmax=0))
+    print(ag.acceleration_g(r, theta_daytona, phi_daytona,nmax=2))
+    print(ag.acceleration_g(r, theta_daytona, phi_daytona,nmax=40))
+    ag.plot_potential(200, nmax=50)
+    
+    
    
 
     #theta = np.linspace(0,np.pi, 100)

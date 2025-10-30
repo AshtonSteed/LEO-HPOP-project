@@ -10,6 +10,8 @@ import skyfield.api as sf
 
 
 
+
+
 # Name of Function: state_update_full
 # Arguments / variables used:
 #   - t: Current time (unused, but required by solve_ivp signature)
@@ -43,6 +45,19 @@ def state_update(t, statevec, g: Gravity, ts: sf.Timescale, n=0):
     # The last three elements of the output are the acceleration components (dv/dt = a)
     output[3:] = a
     
+    if not np.all(np.isfinite(output)):
+            print(f"🚨 BAD VALUE DETECTED! 🚨")
+    
+            print(f"Input Position: {r} {theta} {phi}")
+            print(f"  Output Accel: {a}")
+            print(f" r_itrs: {xyz_itrs}")
+            print(f" a_sphr: {a_sphr}")
+            print(f" a_itrs: {a_itrs}")
+            print("="*40 + "\n")
+            
+    
+        
+    
     return output
 
 
@@ -59,11 +74,12 @@ def integrate(initial_state_vector, t_span, dt, g, ts, n):
 
     # Use scipy.integrate.solve_ivp to perform the numerical integration
     results = sp.integrate.solve_ivp(state_update, t_span, initial_state_vector,
-                                     first_step=dt, rtol=1e-12, atol=1e-12, method='DOP853', args=[g, ts, n])
+                                     first_step=dt, rtol=1e-13, atol=1e-13, method='DOP853', args=[g, ts, n])
     return results
 
 
 def main():
+   
     print("Starting orbital simulation accuracy comparison...")
 
     g = Gravity()
@@ -74,8 +90,9 @@ def main():
     v_initial = np.array([0, 0, np.sqrt(g.mu / (g.radius + 500))]) # Velocity vector [km/s]
     
     #Define start and end times in UTC
+    #UTC format: Year, Month, Day, Hour, Minute, Second
     t_start_utc = ts.utc(2022, 1, 1, 0, 0, 0)
-    t_end_utc = ts.utc(2022, 1, 5, 0, 0)
+    t_end_utc = ts.utc(2022, 1, 2, 0, 0, 0)
     #Convert to Julian Date "Physics ready" time
     t_start_db = t_start_utc.tdb * 86400  # Convert days to seconds
     t_end_db = t_end_utc.tdb * 86400      # Convert days to seconds
@@ -99,7 +116,7 @@ def main():
     print("Initial velocity: ", initial_satellite_state.v())
 
     # List of N-M values to test (assuming N=M for simplicity, as per gravity model)
-    n_values = [4, 8]  # Different maximum degrees
+    n_values = [0,2,3,4,8, 30, 100]  # Different maximum degrees
 
     results = {}
 
@@ -115,7 +132,7 @@ def main():
 
         # Store final position for later error calculation
         final_position = simulation_results.y[:3, -1]
-        #lot_orbit(simulation_results, g.radius)
+        #plot_orbit(simulation_results, g.radius)
 
         # Log results
         results[n] = {
@@ -125,7 +142,8 @@ def main():
         }
 
         print(f"Simulation with N=M={n} completed in {elapsed_time:.2f} seconds.")
-        print(f"Number of integration steps: {len(simulation_results.t)}")
+        print(f"Status: {simulation_results.message}")
+    
 
     # Compute position errors relative to the highest accuracy simulation
     reference_n = max(n_values)
@@ -144,7 +162,7 @@ def main():
         
 
     # Optionally plot the orbit for the highest accuracy (highest N)
-    # plot_orbit(simulation_results, g.radius)
+    plot_orbit(simulation_results, g.radius)
 
 
 # Name of Function: plot_orbit
