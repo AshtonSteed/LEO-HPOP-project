@@ -87,7 +87,7 @@ def main():
 
     # Initial conditions for a 500km circular orbit in ICRS
     r_initial = np.array([g.radius + 500, 0, 0])  # Position vector [km]
-    v_initial = np.array([0, 0, np.sqrt(g.mu / (g.radius + 500))]) # Velocity vector [km/s]
+    v_initial = np.array([0, 1, np.sqrt(g.mu / (g.radius + 500))]) # Velocity vector [km/s]
     
     #Define start and end times in UTC
     #UTC format: Year, Month, Day, Hour, Minute, Second
@@ -116,7 +116,7 @@ def main():
     print("Initial velocity: ", initial_satellite_state.v())
 
     # List of N-M values to test (assuming N=M for simplicity, as per gravity model)
-    n_values = [0,2,3,4,8, 30, 100]  # Different maximum degrees
+    n_values = [0,20]  # Different maximum degrees
 
     results = {}
 
@@ -132,33 +132,116 @@ def main():
 
         # Store final position for later error calculation
         final_position = simulation_results.y[:3, -1]
+        final_velocity = simulation_results.y[3:, -1]
+        final_state_vector = np.concatenate((final_position, final_velocity))
+        
+        # Create State object for orbital element calculation
+        final_state = State(final_state_vector, t_end_db)
+        
+        # Calculate orbital elements for the final state
+        orbital_elements = final_state.to_koe(g.mu)
+        a, e, i, raan, arg_peri, theta = orbital_elements
+
         #plot_orbit(simulation_results, g.radius)
 
         # Log results
         results[n] = {
             'time': elapsed_time,
             'final_position': final_position,
+            'final_state_vector': final_state_vector,
+            'orbital_elements': {
+                'semi_major_axis': a,
+                'eccentricity': e,
+                'inclination': i,
+                'raan': raan,
+                'arg_periapsis': arg_peri,
+                'true_anomaly': theta
+            },
             'num_steps': len(simulation_results.t)
         }
 
         print(f"Simulation with N=M={n} completed in {elapsed_time:.2f} seconds.")
         print(f"Status: {simulation_results.message}")
+        
+        # Print final orbital elements for this simulation
+        print(f"\nFinal Orbital Elements (N=M={n}):")
+        print(f"  Semi-major axis (a):     {a:12.6f} km")
+        print(f"  Eccentricity (e):        {e:12.8f}")
+        print(f"  Inclination (i):         {np.rad2deg(i):12.6f} deg")
+        print(f"  RAAN (Ω):                {np.rad2deg(raan):12.6f} deg")
+        print(f"  Arg. periapsis (ω):      {np.rad2deg(arg_peri):12.6f} deg")
+        print(f"  True anomaly (ν):        {np.rad2deg(theta):12.6f} deg")
     
 
-    # Compute position errors relative to the highest accuracy simulation
+    # Compute position and orbital elements errors relative to the highest accuracy simulation
     reference_n = max(n_values)
     reference_position = results[reference_n]['final_position']
+    reference_elements = results[reference_n]['orbital_elements']
+    
     for n in n_values:
+        # Calculate position error
         position_error = np.linalg.norm(results[n]['final_position'] - reference_position)
         results[n]['position_error'] = position_error
-        print(f"Position error relative to N=M={reference_n}: {position_error:.6f} km")
+        
+        # Calculate orbital elements errors
+        element_errors = {}
+        element_names = ['semi_major_axis', 'eccentricity', 'inclination', 'raan', 'arg_periapsis', 'true_anomaly']
+        element_units = ['km', '', 'rad', 'rad', 'rad', 'rad']
+        
+        for i, element_name in enumerate(element_names):
+            if element_name == 'semi_major_axis':
+                # For semi-major axis, use absolute error in km
+                element_errors[element_name] = abs(results[n]['orbital_elements'][element_name] - reference_elements[element_name])
+            elif element_name == 'eccentricity':
+                # For eccentricity, use absolute error (dimensionless)
+                element_errors[element_name] = abs(results[n]['orbital_elements'][element_name] - reference_elements[element_name])
+            else:
+                # For angular elements, calculate the smallest angular difference
+                diff = results[n]['orbital_elements'][element_name] - reference_elements[element_name]
+                # Normalize to [-π, π] range
+                while diff > np.pi:
+                    diff -= 2 * np.pi
+                while diff < -np.pi:
+                    diff += 2 * np.pi
+                element_errors[element_name] = abs(diff)
+        
+        results[n]['element_errors'] = element_errors
+        
+        print(f"\nErrors relative to N=M={reference_n} for N=M={n}:")
+        print(f"  Position error: {position_error:.6f} km")
+        print(f"  Semi-major axis error: {element_errors['semi_major_axis']:.6f} km")
+        print(f"  Eccentricity error: {element_errors['eccentricity']:.8f}")
+        print(f"  Inclination error: {element_errors['inclination']:.8f} rad ({np.rad2deg(element_errors['inclination']):.6f} deg)")
+        print(f"  RAAN error: {element_errors['raan']:.8f} rad ({np.rad2deg(element_errors['raan']):.6f} deg)")
+        print(f"  Arg periapsis error: {element_errors['arg_periapsis']:.8f} rad ({np.rad2deg(element_errors['arg_periapsis']):.6f} deg)")
+        print(f"  True anomaly error: {element_errors['true_anomaly']:.8f} rad ({np.rad2deg(element_errors['true_anomaly']):.6f} deg)")
 
     # Print summary
-    print("\nSummary of results:")
-    print("N=M | Time (s) | Position Error (km) | Steps")
-    print("-" * 40)
+    print("\n" + "="*80)
+    print("SUMMARY OF RESULTS")
+    print("="*80)
+    print("\nPosition and Orbital Elements Comparison:")
+    print("-" * 80)
+    print(f"{'N=M':>3} | {'Time (s)':>8} | {'Pos Error (km)':>15} | {'a Error (km)':>12} | {'e Error':>10} | {'i Error (deg)':>12}")
+    print("-" * 80)
     for n, data in results.items():
-        print(f"{n:3d} | {data['time']:8.2f} | {data['position_error']:17.6f} | {data['num_steps']:5d}")
+        a_error = data['element_errors']['semi_major_axis']
+        e_error = data['element_errors']['eccentricity']
+        i_error_deg = np.rad2deg(data['element_errors']['inclination'])
+        print(f"{n:3d} | {data['time']:8.2f} | {data['position_error']:15.6f} | {a_error:12.6f} | {e_error:10.8f} | {i_error_deg:12.6f}")
+    
+    print("\nDetailed Angular Elements Errors (degrees):")
+    print("-" * 60)
+    print(f"{'N=M':>3} | {'RAAN (deg)':>12} | {'ω (deg)':>12} | {'ν (deg)':>12}")
+    print("-" * 60)
+    for n, data in results.items():
+        raan_error_deg = np.rad2deg(data['element_errors']['raan'])
+        arg_peri_error_deg = np.rad2deg(data['element_errors']['arg_periapsis'])
+        theta_error_deg = np.rad2deg(data['element_errors']['true_anomaly'])
+        print(f"{n:3d} | {raan_error_deg:12.6f} | {arg_peri_error_deg:12.6f} | {theta_error_deg:12.6f}")
+    
+    print(f"\nReference solution: N=M={reference_n}")
+    print(f"Total integration steps across all simulations: {sum(data['num_steps'] for data in results.values())}")
         
 
     # Optionally plot the orbit for the highest accuracy (highest N)

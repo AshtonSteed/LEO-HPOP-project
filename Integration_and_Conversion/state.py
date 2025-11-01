@@ -63,6 +63,97 @@ class State:
     # Get velocity vector
     def v(self):    
         return self.state[3:]
+    
+    # Convert state to Keplerian Orbital Elements with singularity handling
+    def to_koe(self, mu):
+        # Calculate specific angular momentum vector
+        r = self.r()
+        v = self.v()
+        h_vec = np.cross(r, v)
+        
+        # Calculate unit Eccentricity vector and value
+        e_vec = np.cross(v, h_vec) / mu - r / np.linalg.norm(r)
+        e = np.linalg.norm(e_vec)
+        
+        # Find vector toward ascending node
+        n_vec = np.cross([0, 0, 1], h_vec)
+        
+        # Calculate Inclination
+        i = np.arccos(h_vec[2] / np.linalg.norm(h_vec))
+        
+        # Handle singularities based on eccentricity and inclination
+        tolerance = 1e-10  # Small tolerance for numerical stability
+        
+        # Case 1: Circular orbit (e ≈ 0)
+        if e < tolerance:
+            # For circular orbits, argument of periapsis is undefined
+            # Return argument of latitude (u = ω + ν) instead
+            if np.linalg.norm(n_vec) > tolerance:
+                # Non-equatorial circular orbit - RAAN is still defined
+                # Calculate RAAN
+                if n_vec[1] >= 0:
+                    raan = np.arccos(n_vec[0] / np.linalg.norm(n_vec))
+                else:
+                    raan = 2 * np.pi - np.arccos(n_vec[0] / np.linalg.norm(n_vec))
+                
+                # Calculate argument of latitude (u = ω + ν)
+                u = np.arccos(np.dot(n_vec, r) / (np.linalg.norm(n_vec) * np.linalg.norm(r)))
+                if r[2] >= 0:
+                    u = u
+                else:
+                    u = 2 * np.pi - u
+                arg_peri = 0.0  # Undefined for circular orbits
+                theta = u  # Argument of latitude
+            else:
+                # Equatorial circular orbit - both RAAN and argument of periapsis are undefined
+                raan = 0.0  # Reference direction
+                theta = np.arctan2(r[1], r[0])  # True longitude
+                arg_peri = 0.0  # Undefined for circular orbits
+        else:
+            # Case 2: Elliptical orbit (e > 0)
+            
+            # Calculate RAAN (Right Ascension of Ascending Node)
+            if np.linalg.norm(n_vec) > tolerance:
+                # Non-equatorial orbit
+                if n_vec[1] >= 0:
+                    raan = np.arccos(n_vec[0] / np.linalg.norm(n_vec))
+                else:
+                    raan = 2 * np.pi - np.arccos(n_vec[0] / np.linalg.norm(n_vec))
+            else:
+                # Equatorial orbit - RAAN is undefined, set to 0
+                raan = 0.0
+            
+            # Calculate Argument of Periapsis
+            if np.linalg.norm(n_vec) > tolerance:
+                # Non-equatorial elliptical orbit
+                if e_vec[2] >= 0:
+                    arg_peri = np.arccos(np.dot(n_vec, e_vec) / (np.linalg.norm(n_vec) * e))
+                else:
+                    arg_peri = 2 * np.pi - np.arccos(np.dot(n_vec, e_vec) / (np.linalg.norm(n_vec) * e))
+            else:
+                # Equatorial elliptical orbit - use longitude of perigee
+                # Longitude of perigee = RAAN + ω, but RAAN is undefined for equatorial orbits
+                # So we return the longitude of perigee directly
+                arg_peri = np.arctan2(e_vec[1], e_vec[0])
+                if arg_peri < 0:
+                    arg_peri += 2 * np.pi
+            
+            # Calculate True Anomaly
+            if np.dot(r, v) >= 0:
+                # Moving away from periapsis
+                theta = np.arccos(np.dot(e_vec, r) / (e * np.linalg.norm(r)))
+            else:
+                # Moving toward periapsis
+                theta = 2 * np.pi - np.arccos(np.dot(e_vec, r) / (e * np.linalg.norm(r)))
+        
+        # Calculate Semi-Major Axis
+        a = 1 / (2 / np.linalg.norm(r) - np.linalg.norm(v)**2 / mu)
+        
+        return a, e, i, raan, arg_peri, theta
+        
+        
+        
+        
     """
     STATE UPDATE FUNCTIONS
     """
