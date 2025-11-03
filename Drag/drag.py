@@ -1,5 +1,5 @@
 #TODO: A drag class that uses NRLMSIS to calculate drag from date/10.7 and location
-import pymsis
+from pymsis import utils
 import numpy as np
 class Drag:
 
@@ -12,7 +12,7 @@ class Drag:
         step = np.timedelta64(3,'h') # Ap Index updated every 3 hours, F10.7 daily. use either 1 day or 3 hour step size
         # Generate date array from start to end date with specified step
         dates = np.arange(start_date, end_date, step, dtype='datetime64[s]')
-        self.solarmag = np.column_stack(pymsis.utils.get_f107_ap(dates))
+        self.solarmag = np.column_stack(utils.get_f107_ap(dates))
         self.dates = dates.astype('float64') # Convert to float64 for interpolation
         print(self.solarmag)
         # NOTE: Datetime MUST be in consistent units for conversion
