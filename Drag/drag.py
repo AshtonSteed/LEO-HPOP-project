@@ -1,8 +1,10 @@
 #TODO: A drag class that uses NRLMSIS to calculate drag from date/10.7 and location
 import pymsis
 import numpy as np
-
 class Drag:
+
+    solarmag = None
+    dates = None
     def __init__(self):
         pass
     

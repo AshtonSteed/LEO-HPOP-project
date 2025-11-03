@@ -168,7 +168,7 @@ class State:
 
         self.state = self.state + (k1 + 2 * k2 + 2 * k3 + k4) / 6
 
-        return self.state_list.append(State(self.state[:3], self.state[3:], self.t + dt))
+        return self.state_list.append(State(self.state, self.t + dt))
 
     # Runge-Kutta 8th Order
     #
@@ -195,14 +195,14 @@ class State:
         self.state = self.state + dt / 840 * (41 * k_1 + 27 * k_4 + 272 * k_5 + 27 * k_6 + 216 * k_7 + 216 * k_9 + 41
                                               * k_10)
 
-        return self.state_list.append(State(self.r(), self.v(), self.t + dt))
+        return self.state_list.append(State(self.state, self.t + dt))
 
     # Derivative function
     # input time, radius vector, velocity vector, output array w/ velocity vector, acceleration vector
     def deriv(self, t, y):
         r, v = y[:3], y[3:]
         a_ecef = grav.acceleration_g(*self.xyz_to_sphr(self.gcrf_to_ecef(*r, t)))
-        a_gcrf = np.array(self.sphr_to_xyz(self.ecef_to_gcrf(*a_ecef, t)))
+        a_gcrf = np.array(self.sphr_to_xyz_point(self.ecef_to_gcrf(*a_ecef, t)))
         return np.concatenate(v, a_gcrf)
 
     """
@@ -282,6 +282,7 @@ class State:
                 long = 2 * np.arctan2(y_ecef, x_ecef)
                 alt = -1 * np.sqrt(1 - self.ECCm_2)
                 return lat, long, alt
+
 
         # If the variable "t" fails the isfinite() check:
         # We switch to an iterative method called the Bowring Method, which has the same validity but may
@@ -471,7 +472,7 @@ if __name__ == "__main__":
 
     rx = State.xyz_to_sphr(r)
 
-    ry = State.sphr_to_xyz(rx)
+    ry = State.sphr_to_xyz_point(rx)
 
 
     print(r, rx, ry)

@@ -73,7 +73,7 @@ def state_update(t, statevec, g: Gravity, ts: sf.Timescale, n=0):
 def integrate(initial_state_vector, t_span, dt, g, ts, n):
 
     # Use scipy.integrate.solve_ivp to perform the numerical integration
-    results = sp.integrate.solve_ivp(state_update, t_span, initial_state_vector,
+    results = sp.integrate.solve_ivp(fun=state_update, t_span=t_span, y0=initial_state_vector,
                                      first_step=dt, rtol=1e-13, atol=1e-13, method='DOP853', args=[g, ts, n])
     return results
 
