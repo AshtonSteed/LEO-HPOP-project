@@ -285,6 +285,59 @@ class Gravity:
 
         plt.show()
 
+
+
+    # Assuming 'self' is an instance of a class that has 'radius' and 'potential_vec' defined.
+    # The 'potential_vec' function is assumed to accept 2D arrays for theta and phi.
+
+    def plot_potential_vec(self, altitude, nmax=10, num_points=200):
+        """
+        Plot the gravitational potential anomaly with respect to J2 on a map at a specified altitude.
+        """
+        latitude = np.linspace(-np.pi / 2, np.pi / 2, num_points)
+        longitude = np.linspace(-np.pi, np.pi, num_points)
+        lon_grid, lat_grid = np.meshgrid(longitude, latitude)
+
+        # Convert latitude to colatitude (theta)
+        theta_grid = np.pi / 2 - lat_grid  # theta = pi/2 - latitude
+        phi_grid = lon_grid  # longitude = phi
+
+        r = self.radius + altitude
+
+        # --- Vectorized Calculation (Loop Removed) ---
+        # Since potential_vec is vectorized, we can pass the entire
+        # r (scalar), theta_grid (2D array), and phi_grid (2D array) directly.
+        # We take the [0] element, matching the logic from the original loop,
+        # assuming potential_vec returns a tuple (e.g., (potential, ...)).
+        
+        potential_grid = self.potential_vec(r, theta_grid, phi_grid, nmax=nmax)[0]
+        potential_rid = self.potential_vec(r, theta_grid, phi_grid, nmax=2)[0]
+        
+        # --- End of Vectorized Calculation ---
+
+        # Plotting
+        fig, ax = plt.subplots(figsize=(10, 10), subplot_kw={'projection': 'aitoff'})
+
+        # Create a filled mesh plot
+        im = ax.pcolormesh(lon_grid, lat_grid, potential_grid - potential_rid,
+                        cmap='viridis')  # Adjust levels as needed
+
+        # Add a colorbar
+        fig.colorbar(im, ax=ax, label='Gravitational Potential Anomaly J{}-J2 (km^2/s^2)'.format(nmax))
+
+        # Daytona Beach coordinates
+        lat_daytona = np.radians(29.218103)
+        lon_daytona = np.radians(-81.031723)
+
+        # Plot Daytona Beach point
+        ax.scatter(lon_daytona, lat_daytona, color='red', s=100, label='Daytona Beach')
+
+        ax.set_xlabel('Longitude (rad)')
+        ax.set_ylabel('Latitude (rad)')
+        ax.set_title('Gravitational Potential Anomaly Map at {} km Altitude'.format(altitude))
+        ax.grid(True)
+
+        plt.show()
     def acceleration_g(self, r, theta, phi, nmax=20, relerror=0E-2):
         
         
@@ -387,6 +440,7 @@ if __name__ == '__main__':
     print(ag.acceleration_g(r, theta_daytona, phi_daytona,nmax=2))
     print(ag.acceleration_g(r, theta_daytona, phi_daytona,nmax=40))
     ag.plot_potential(200, nmax=50)
+    ag.plot_potential_vec(200, nmax=50)
     
     
    
