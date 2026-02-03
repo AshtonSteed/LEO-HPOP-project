@@ -2,6 +2,8 @@ import numpy as np
 import scipy as sp
 import matplotlib.pyplot as plt
 import time
+from Drag.drag import Drag
+from Drag.drag import Drag
 from Gravity.gravity import Gravity
 from Integration_and_Conversion.state import State
 import skyfield.api as sf
@@ -18,7 +20,7 @@ import skyfield.api as sf
 #   - statevec: A numpy array representing the current state vector [rx, ry, rz, vx, vy, vz]
 #   This function serves as the derivative function for scipy.integrate.solve_ivp, returning
 #   the derivatives of the state vector [vx, vy, vz, ax, ay, az].
-def state_update(t, statevec, g: Gravity, ts: sf.Timescale, n=0):
+def state_update(t, statevec, g: Gravity,d: Drag, ts: sf.Timescale, n=0):
     
     # Initialize output array for derivatives [vx, vy, vz, ax, ay, az]
     output = np.zeros_like(statevec)
@@ -39,17 +41,23 @@ def state_update(t, statevec, g: Gravity, ts: sf.Timescale, n=0):
     # Convert acceleration back Cartesian ITRS frame
     a_itrs = State.sphr_to_xyz_vec((r_norm,theta,phi),a_sphr)
     #Now convert acceleration to ICRS frame
-    a = State.itrs_to_icrs(a_itrs, t, ts)
+    a_g = State.itrs_to_icrs(a_itrs, t, ts)
+    
+    
+    # Calculate Drag Acceleration
+    a_d = d.drag_acceleration(r, v, t, high_fidelity=False)
+    
+
     
     output[:3] = v
     # The last three elements of the output are the acceleration components (dv/dt = a)
-    output[3:] = a
+    output[3:] = a_g + a_d
     
     if not np.all(np.isfinite(output)):
             print(f"🚨 BAD VALUE DETECTED! 🚨")
     
             print(f"Input Position: {r} {theta} {phi}")
-            print(f"  Output Accel: {a}")
+            print(f"  Output Accel: {output[3:]}")
             print(f" r_itrs: {xyz_itrs}")
             print(f" a_sphr: {a_sphr}")
             print(f" a_itrs: {a_itrs}")
@@ -70,11 +78,11 @@ def state_update(t, statevec, g: Gravity, ts: sf.Timescale, n=0):
 # What the intention of the function is:
 #   This function numerically integrates the equations of motion using scipy.integrate.solve_ivp.
 #   It takes an initial state vector and a time span, and returns the results of the integration.
-def integrate(initial_state_vector, t_span, dt, g, ts, n):
+def integrate(initial_state_vector, t_span, dt, g, d, ts, n):
 
     # Use scipy.integrate.solve_ivp to perform the numerical integration
     results = sp.integrate.solve_ivp(fun=state_update, t_span=t_span, y0=initial_state_vector,
-                                     first_step=dt, rtol=1e-13, atol=1e-13, method='DOP853', args=[g, ts, n])
+                                     first_step=dt, rtol=1e-13, atol=1e-13, method='DOP853', args=[g, d, ts, n])
     return results
 
 
@@ -83,6 +91,7 @@ def main():
     print("Starting orbital simulation accuracy comparison...")
 
     g = Gravity()
+    d = Drag()
     ts = sf.load.timescale()
 
     # Initial conditions for a 500km circular orbit in ICRS
@@ -92,7 +101,7 @@ def main():
     #Define start and end times in UTC
     #UTC format: Year, Month, Day, Hour, Minute, Second
     t_start_utc = ts.utc(2022, 1, 1, 0, 0, 0)
-    t_end_utc = ts.utc(2022, 1, 2, 0, 0, 0)
+    t_end_utc = ts.utc(2022, 1, 1, 0, 0, 0)
     #Convert to Julian Date "Physics ready" time
     t_start_db = t_start_utc.tdb * 86400  # Convert days to seconds
     t_end_db = t_end_utc.tdb * 86400      # Convert days to seconds
@@ -125,7 +134,7 @@ def main():
         start_time = time.time()
 
         # Integrate the equations of motion
-        simulation_results = integrate(initial_satellite_state.state, t_span, time_step, g, ts, n)
+        simulation_results = integrate(initial_satellite_state.state, t_span, time_step, g, d, ts, n)
 
         end_time = time.time()
         elapsed_time = end_time - start_time
