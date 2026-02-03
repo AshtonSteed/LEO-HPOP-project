@@ -252,38 +252,56 @@ class Gravity:
         phi_grid = lon_grid  # longitude = phi
 
         r = self.radius + altitude
+        
+        
+       
+        e2 = 0.00669437999014
+        R = np.sqrt((r**2 * (1 - e2))/(1-e2*np.cos(lat_grid)**2))
+        
 
         # Calculate potential on the grid
         potential_grid = np.zeros_like(lat_grid)
         potential_rid = np.zeros_like(lat_grid)
 
         for i in range(num_points):
+            print(f"Row {i}")
             for j in range(num_points):
-                potential_grid[i, j] = self.potential_vec(r, theta_grid[i, j], phi_grid[i, j], nmax=nmax)[0]
-                potential_rid[i, j] = self.potential_vec(r, theta_grid[i, j], phi_grid[i, j], nmax=2)[0]
+                potential_grid[i, j] = self.potential_vec(R[i,j], theta_grid[i, j], phi_grid[i, j], nmax=nmax)[0]
+                potential_rid[i, j] = self.potential_vec(R[i,j], theta_grid[i, j], phi_grid[i, j], nmax=2)[0]
                 #potential_rid[i,j] =self.potential(radius, theta_grid[i, j], phi_grid[i, j], nmax=0)[0]
 
-        # Plotting
+
+        plt.rcParams.update({
+            "text.usetex": True,
+            "font.family": "serif",
+            "font.serif": ["Computer Modern Roman"], # Or "Times New Roman", etc.
+        })
+                # Plotting
         fig, ax = plt.subplots(figsize=(10, 10), subplot_kw={'projection': 'aitoff'})
 
         # Create a filled mesh plot
-        im = ax.pcolormesh(lon_grid, lat_grid, potential_grid - potential_rid,
-                           cmap='viridis')  # Adjust levels as needed
+        im = ax.pcolormesh(lon_grid, lat_grid, -potential_grid - potential_rid,
+                           cmap='viridis', shading='gouraud', rasterized=True)  # Adjust levels as needed
+        #im = ax.pcolormesh(lon_grid, lat_grid, R,
+        #                   cmap='viridis', shading='gouraud', rasterized=True)  # Adjust levels as needed
 
         # Add a colorbar
-        fig.colorbar(im, ax=ax, label='Gravitational Potential Anomaly J{}-J2 (km^2/s^2)'.format(nmax))
+        fig.colorbar(im, ax=ax, label=r'Geopotential Elliptical Anomaly $[\frac{km^2}{s^2}]$', shrink=0.5)
 
-        # Daytona Beach coordinates
+        # Daytona Beach coordinates 
         lat_daytona = np.radians(29.218103)
         lon_daytona = np.radians(-81.031723)
 
         # Plot Daytona Beach point
-        ax.scatter(lon_daytona, lat_daytona, color='red', s=100, label='Daytona Beach')
+        #ax.scatter(lon_daytona, lat_daytona, color='red', s=100, label='Daytona Beach')
 
-        ax.set_xlabel('Longitude (rad)')
-        ax.set_ylabel('Latitude (rad)')
-        ax.set_title('Gravitational Potential Anomaly Map at {} km Altitude'.format(altitude))
+        ax.set_xlabel('Longitude (deg)')
+        ax.set_ylabel('Latitude (deg)')
+        ax.set_title('Sea-Level Geopotential Anomaly', y=1.05)
         ax.grid(True)
+        
+        # Save the plot as an SVG file
+        #plt.savefig("pot.svg", dpi=200)
 
         plt.show()
 
@@ -389,8 +407,8 @@ if __name__ == '__main__':
     print(ag.acceleration_g(r, theta_daytona, phi_daytona,nmax=1000))
     print(ag.acceleration_g(r, theta_daytona, phi_daytona,nmax=0))
     print(ag.acceleration_g(r, theta_daytona, phi_daytona,nmax=2))
-    print(ag.acceleration_g(r, theta_daytona, phi_daytona,nmax=40))
-    ag.plot_potential(400, nmax=200)
+    print(ag.acceleration_g(r, theta_daytona, phi_daytona,nmax=40)) 
+    ag.plot_potential(0, nmax=200, num_points=200)
     
     
     

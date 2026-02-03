@@ -116,7 +116,7 @@ def main():
     print("Initial velocity: ", initial_satellite_state.v())
 
     # List of N-M values to test (assuming N=M for simplicity, as per gravity model)
-    n_values = [0,20]  # Different maximum degrees
+    n_values = [0]  # Different maximum degrees
 
     results = {}
 
@@ -274,7 +274,7 @@ def plot_orbit(results, r_earth):
 
     ax.plot(x, y, z, label='Satellite Trajectory')
     ax.scatter(x[0], y[0], z[0], color='green', marker='o', s=50, label='Start Position')
-    ax.scatter(x[-1], y[-1], z[-1], color='red', marker='x', s=50, label='End Position')
+    #ax.scatter(x[-1], y[-1], z[-1], color='red', marker='x', s=50, label='End Position')
     
     #Set the aspect of the grid to be similar to data displayed
     sx = max(np.ptp(x), 2*r_earth)
@@ -290,6 +290,7 @@ def plot_orbit(results, r_earth):
     ax.legend()
     ax.grid(True)
     plt.show()
+    plt.savefig("orb.svg", dpi=200)
 
 
 if __name__ == "__main__":
