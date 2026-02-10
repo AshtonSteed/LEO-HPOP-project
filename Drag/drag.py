@@ -21,6 +21,8 @@ class Drag:
 
     solarmag = None
     dates = None
+    log_density_spline = None
+    
     def __init__(self):
         self._init_ussa_1976_spline()
     
@@ -37,6 +39,26 @@ class Drag:
         # bc_type='natural' ensures 2nd derivative is zero at ends (smooth vacuum transition)
         self.log_rho_spline = CubicSpline(self._ALTS, log_rhos, bc_type='natural', extrapolate=False)
 
+
+    def fill_density_spline(self, time_samples, density_samples):
+        '''
+        Function to create a cubic spline of ln(density) vs time, using samples from pymsis or other sources.
+        Inputs should be arrays of the same length, where time_samples are the time points and density_samples are the corresponding densities
+        The time_samples should come from a prior simulation run, and the samples from a batch high-fidelity calculation of density
+        
+        :param time_samples: Description
+        :param density_samples: Description
+        '''
+        # Limit density to a minimum value to prevent log(0) issues in spline
+        density_clean = np.maximum(density_samples, 1e-16)
+        
+        # Calculate logarithm for each value, allows for easier interpolation
+        log_density = np.log(density_clean)
+        
+        # Create a smooth, cubic spline that returns log_density for any time within the samped range
+        self.log_density_spline = CubicSpline(time_samples, log_density, bc_type='natural', extrapolate=False)
+        
+        
     def get_ussa_density(self, h_km):
         # h_km: altitude in kilometers
         """
@@ -86,7 +108,11 @@ class Drag:
             density = self.get_ussa_density(altitude_km)  # Earth radius in km
         else:
             # Do the high fidelity density using pymsis array
-            pass
+            # High Fidelity pass
+            # Sample from interpolated array
+            # TODO: date must match the time units used in the spline (probably seconds since epoch)
+            log_density = self.log_density_spline(date.astype('float64'))
+            density = np.exp(log_density)  # Convert back from log density
             
         
         # Earths Angular Velocity in rad/s
