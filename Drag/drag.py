@@ -39,7 +39,16 @@ class Drag:
         # bc_type='natural' ensures 2nd derivative is zero at ends (smooth vacuum transition)
         self.log_rho_spline = CubicSpline(self._ALTS, log_rhos, bc_type='natural', extrapolate=False)
 
-
+    def update_density(self, times, positions):
+        #Times in consistent units
+        #positions in GCRF (x,y,z) in km
+        
+        # do whatever is needed to find nrlmsis (or whatever) density for all (t, y) 
+        # Probably need to do coordinate conversions, maybe do this outside of this function and pass the ECEF spherical coords instead?
+        densities = None #TODO
+        #fill the density spline with new data
+        self.fill_density_spline(times, densities)
+        
     def fill_density_spline(self, time_samples, density_samples):
         '''
         Function to create a cubic spline of ln(density) vs time, using samples from pymsis or other sources.

@@ -20,7 +20,7 @@ import skyfield.api as sf
 #   - statevec: A numpy array representing the current state vector [rx, ry, rz, vx, vy, vz]
 #   This function serves as the derivative function for scipy.integrate.solve_ivp, returning
 #   the derivatives of the state vector [vx, vy, vz, ax, ay, az].
-def state_update(t, statevec, g: Gravity,d: Drag, ts: sf.Timescale, n=0):
+def state_update(t, statevec, g: Gravity,d: Drag, ts: sf.Timescale, high_fidelity=True, n=0):
     
     # Initialize output array for derivatives [vx, vy, vz, ax, ay, az]
     output = np.zeros_like(statevec)
@@ -44,8 +44,8 @@ def state_update(t, statevec, g: Gravity,d: Drag, ts: sf.Timescale, n=0):
     a_g = State.itrs_to_icrs(a_itrs, t, ts)
     
     
-    # Calculate Drag Acceleration
-    a_d = d.drag_acceleration(r, v, t, high_fidelity=False)
+    # Calculate Drag Acceleration, if this is the first iteration, use a low fidelity run
+    a_d = d.drag_acceleration(r, v, t, high_fidelity=high_fidelity)
     
 
     
@@ -81,8 +81,21 @@ def state_update(t, statevec, g: Gravity,d: Drag, ts: sf.Timescale, n=0):
 def integrate(initial_state_vector, t_span, dt, g, d, ts, n):
 
     # Use scipy.integrate.solve_ivp to perform the numerical integration
+    
+    # First, define a definite set of times for density sampling (15 second intervals)
+    t_samples = np.arange(t_span[0], t_span[1], 15)
+    
+    # First run should be a low fidelity run
     results = sp.integrate.solve_ivp(fun=state_update, t_span=t_span, y0=initial_state_vector,
-                                     first_step=dt, rtol=1e-13, atol=1e-13, method='DOP853', args=[g, d, ts, n])
+                                    first_step=dt, rtol=1e-8, atol=1e-8, method='DOP853', t_eval=t_samples, args=[g, d, ts, False, n/2])
+    
+    # Now calculate populate density samples using this run
+    d.update_density(results.t, results.y[:3, :])
+    
+    # Now do the full, high fidelity run
+    results = sp.integrate.solve_ivp(fun=state_update, t_span=t_span, y0=initial_state_vector,
+                                     first_step=dt, rtol=1e-13, atol=1e-13, method='DOP853', t_eval=None, args=[g, d, ts, True, n])
+    
     return results
 
 
