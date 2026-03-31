@@ -68,6 +68,8 @@ def state_update(t, statevec, g: Gravity,d: Drag, b: Bodies, ts: sf.Timescale, h
             print(f" a_itrs: {a_itrs}")
             print("="*40 + "\n")
             
+            raise ValueError("Non-finite value detected in state update output.")
+            
     
         
     
@@ -88,11 +90,11 @@ def integrate(initial_state_vector, t_span, dt, g, d, b, ts, n):
     # Use scipy.integrate.solve_ivp to perform the numerical integration
     
     # First, define a definite set of times for density sampling (15 second intervals)
-    t_samples = np.arange(t_span[0], t_span[1], 1000)
+    t_samples = np.arange(t_span[0], t_span[1], 15)
     
     # First run should be a low fidelity run
     results = sp.integrate.solve_ivp(fun=state_update, t_span=t_span, y0=initial_state_vector,
-                                    first_step=dt, rtol=1e-8, atol=1e-8, method='DOP853', t_eval=t_samples, args=[g, d, b,ts, False, n//2])
+                                    first_step=dt, rtol=1e-6, atol=1e-6, method='DOP853', t_eval=t_samples, args=[g, d, b,ts, False, n//2])
     
     # Now calculate populate density samples using this run
     d.update_density(results.t, results.y[:3, :])
@@ -120,7 +122,7 @@ def main():
     #Define start and end times in UTC
     #UTC format: Year, Month, Day, Hour, Minute, Second
     t_start_utc = ts.utc(2022, 1, 1, 0, 0, 0)
-    t_end_utc = ts.utc(2022, 1, 2, 0, 0, 0)
+    t_end_utc = ts.utc(2022, 1, 1, 6, 0, 0)
     #Convert to Julian Date "Physics ready" time
     t_start_db = t_start_utc.tdb * 86400  # Convert days to seconds
     t_end_db = t_end_utc.tdb * 86400      # Convert days to seconds

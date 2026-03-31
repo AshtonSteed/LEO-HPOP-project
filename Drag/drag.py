@@ -2,6 +2,7 @@
 from pymsis import utils
 from scipy.interpolate import (interp1d, CubicSpline)
 import numpy as np
+
 class Drag:
     # USSA-76 Constants (Class Attributes)
     # Parameters for the 1976 US Standard Atmosphere model, used for basic or preliminary density calculations.
@@ -65,7 +66,7 @@ class Drag:
         log_density = np.log(density_clean)
         
         # Create a smooth, cubic spline that returns log_density for any time within the samped range
-        self.log_density_spline = CubicSpline(time_samples, log_density, bc_type='natural', extrapolate=False)
+        self.log_density_spline = CubicSpline(time_samples, log_density, bc_type='clamped', extrapolate=True)
         
         
     def get_ussa_density(self, h_km):
@@ -122,7 +123,10 @@ class Drag:
             # Sample from interpolated array
             # TODO: date must match the time units used in the spline (probably seconds since epoch)
             log_density = self.log_density_spline(t)
-            density = np.exp(log_density)  # Convert back from log density
+            density = np.exp(log_density)  # Convert back from log densiy
+            #print(log_density , density, t)
+            
+            
             
         
         # Earths Angular Velocity in rad/s
