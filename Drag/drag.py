@@ -45,7 +45,7 @@ class Drag:
         
         # do whatever is needed to find nrlmsis (or whatever) density for all (t, y) 
         # Probably need to do coordinate conversions, maybe do this outside of this function and pass the ECEF spherical coords instead?
-        densities = None #TODO
+        densities = self.get_ussa_density(np.linalg.norm(positions, axis=0) - 6378.1363)  # Temp Function for now
         #fill the density spline with new data
         self.fill_density_spline(times, densities)
         
@@ -94,17 +94,18 @@ class Drag:
         # NOTE: Datetime MUST be in consistent units for conversion
     
     # Find the intpolated index for a given time
-    def interpolate_index(self, date):
-        time = date.astype('float64')
-        solarmag = self.solarmag_interp(time)
+    def interpolate_index(self, t):
+        
+        # might need to use skyfield or something else to find Proper UTC time. 
+        solarmag = self.solarmag_interp(t)
         f107, f107a, *ap = solarmag
-        print(f"Interpolated Indices at {date}: F10.7={f107}, F10.7a={f107a}, Ap={ap}")
+        print(f"Interpolated Indices at {t}: F10.7={f107}, F10.7a={f107a}, Ap={ap}")
         
         
-    def drag_acceleration(self, pos_xyz, vel_xyz, date, high_fidelity=False,Cd=2.2, A=1.0e-6, m=1.0, r_earth=6378.1363):
+    def drag_acceleration(self, pos_xyz, vel_xyz, t, high_fidelity=False,Cd=2.2, A=1.0e-6, m=1.0, r_earth=6378.1363):
         # pos_xyz = (x, y, z) in km
         # vel_xyz = (vx, vy, vz) in km/s
-        # date = something??
+        # t = time in seconds since epoch
         
         # Returns acceleration in km/s^2 due to drag
         
@@ -120,7 +121,7 @@ class Drag:
             # High Fidelity pass
             # Sample from interpolated array
             # TODO: date must match the time units used in the spline (probably seconds since epoch)
-            log_density = self.log_density_spline(date.astype('float64'))
+            log_density = self.log_density_spline(t)
             density = np.exp(log_density)  # Convert back from log density
             
         

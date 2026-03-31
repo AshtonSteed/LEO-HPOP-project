@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import time
 from Drag.drag import Drag
 from Drag.drag import Drag
+from Gravity.external_gravity import Bodies
 from Gravity.gravity import Gravity
 from Integration_and_Conversion.state import State
 import skyfield.api as sf
@@ -20,10 +21,12 @@ import skyfield.api as sf
 #   - statevec: A numpy array representing the current state vector [rx, ry, rz, vx, vy, vz]
 #   This function serves as the derivative function for scipy.integrate.solve_ivp, returning
 #   the derivatives of the state vector [vx, vy, vz, ax, ay, az].
-def state_update(t, statevec, g: Gravity,d: Drag, ts: sf.Timescale, high_fidelity=True, n=0):
+def state_update(t, statevec, g: Gravity,d: Drag, b: Bodies, ts: sf.Timescale, high_fidelity=True, n=0):
     
     # Initialize output array for derivatives [vx, vy, vz, ax, ay, az]
     output = np.zeros_like(statevec)
+    
+
     
     # Create a State object for convinience in coordinate conversion and data pulling
     state = State(statevec, t)
@@ -43,15 +46,17 @@ def state_update(t, statevec, g: Gravity,d: Drag, ts: sf.Timescale, high_fidelit
     #Now convert acceleration to ICRS frame
     a_g = State.itrs_to_icrs(a_itrs, t, ts)
     
-    
-    # Calculate Drag Acceleration, if this is the first iteration, use a low fidelity run
+    # Calculae Drag Acceleration, if this is the first iteration, use a low fidelity run
     a_d = d.drag_acceleration(r, v, t, high_fidelity=high_fidelity)
+    a_b = b.get_ext_gravity(r, t, ts)
+    
+
     
 
     
     output[:3] = v
     # The last three elements of the output are the acceleration components (dv/dt = a)
-    output[3:] = a_g + a_d
+    output[3:] = a_g + a_b +a_d
     
     if not np.all(np.isfinite(output)):
             print(f"🚨 BAD VALUE DETECTED! 🚨")
@@ -78,23 +83,23 @@ def state_update(t, statevec, g: Gravity,d: Drag, ts: sf.Timescale, high_fidelit
 # What the intention of the function is:
 #   This function numerically integrates the equations of motion using scipy.integrate.solve_ivp.
 #   It takes an initial state vector and a time span, and returns the results of the integration.
-def integrate(initial_state_vector, t_span, dt, g, d, ts, n):
+def integrate(initial_state_vector, t_span, dt, g, d, b, ts, n):
 
     # Use scipy.integrate.solve_ivp to perform the numerical integration
     
     # First, define a definite set of times for density sampling (15 second intervals)
-    t_samples = np.arange(t_span[0], t_span[1], 15)
+    t_samples = np.arange(t_span[0], t_span[1], 1000)
     
     # First run should be a low fidelity run
     results = sp.integrate.solve_ivp(fun=state_update, t_span=t_span, y0=initial_state_vector,
-                                    first_step=dt, rtol=1e-8, atol=1e-8, method='DOP853', t_eval=t_samples, args=[g, d, ts, False, n/2])
+                                    first_step=dt, rtol=1e-8, atol=1e-8, method='DOP853', t_eval=t_samples, args=[g, d, b,ts, False, n//2])
     
     # Now calculate populate density samples using this run
     d.update_density(results.t, results.y[:3, :])
     
     # Now do the full, high fidelity run
     results = sp.integrate.solve_ivp(fun=state_update, t_span=t_span, y0=initial_state_vector,
-                                     first_step=dt, rtol=1e-13, atol=1e-13, method='DOP853', t_eval=None, args=[g, d, ts, True, n])
+                                     first_step=dt, rtol=1e-13, atol=1e-13, method='DOP853', t_eval=None, args=[g, d, b, ts, True, n])
     
     return results
 
@@ -105,6 +110,7 @@ def main():
 
     g = Gravity()
     d = Drag()
+    b = Bodies() # For external gravity
     ts = sf.load.timescale()
 
     # Initial conditions for a 500km circular orbit in ICRS
@@ -114,7 +120,7 @@ def main():
     #Define start and end times in UTC
     #UTC format: Year, Month, Day, Hour, Minute, Second
     t_start_utc = ts.utc(2022, 1, 1, 0, 0, 0)
-    t_end_utc = ts.utc(2022, 1, 1, 0, 0, 0)
+    t_end_utc = ts.utc(2022, 1, 2, 0, 0, 0)
     #Convert to Julian Date "Physics ready" time
     t_start_db = t_start_utc.tdb * 86400  # Convert days to seconds
     t_end_db = t_end_utc.tdb * 86400      # Convert days to seconds
@@ -147,7 +153,7 @@ def main():
         start_time = time.time()
 
         # Integrate the equations of motion
-        simulation_results = integrate(initial_satellite_state.state, t_span, time_step, g, d, ts, n)
+        simulation_results = integrate(initial_satellite_state.state, t_span, time_step, g, d,b, ts, n)
 
         end_time = time.time()
         elapsed_time = end_time - start_time

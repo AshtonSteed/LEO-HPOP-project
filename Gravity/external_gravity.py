@@ -18,6 +18,8 @@ GM_VALUES = {
 class Bodies:
     def __init__(self, name='de421.bsp'):
         eph = load(name)
+        
+        self.earth = eph['earth']
 
         # Standard names in Skyfield for DE421
         # Bodies to be considered gravitationally!
@@ -35,14 +37,31 @@ class Bodies:
             }
     
     # Returns a summation of the gravitational force
-    def get_ext_gravity(self, position, time):
-        
-        total_force = np.array([0.0, 0.0, 0.0])
-        for body, gm in self.planet_data.items():
+    def get_ext_gravity(self, position, t, timescale):
+        # Find Sum External body acceleration at a time from an epoc ts
+        # Position is Cartesian Vector (x,y,z) in km in GCRF
+        # T is time in seconds since Simulation Start
+        # timescale is a Skyfield timescale object to convert t to a time object for ephemeris lookup
+        time = timescale.tdb(jd=t/86400)
+        total_acceleration = np.array([0.0, 0.0, 0.0])
+        for body_name, data in self.planet_data.items():
+            body = data['body']
+            gm = data['gm']
             # Compute the gravitational acceleration due to this body
-            r = body.position(time) - position
-            r_mag = r.magnitude()
-            if r_mag > 1e-12:  # Avoid division by zero
-                force = -gm * r / (r_mag ** 3)
-                total_force += force
-        return total_force
+            # Skyfield body is relative to solar system barycenter (ICRF), so use Earth position to find relative position to ITRS
+            
+            r_body = (self.earth - body).at(time).position.km
+            r_body_mag = np.linalg.norm(r_body)
+            
+            r_sat_to_body = r_body - position
+            r_sat_to_body_mag = np.linalg.norm(r_sat_to_body)
+            
+            if r_body_mag > 1e-12 and r_sat_to_body_mag > 1e-12:  # Avoid division by zero
+                # Calculate acceleration with respect to Earth-centered inertial frame
+                # So subtract acceleration of body onto Earth
+                direct_term = r_sat_to_body / (r_sat_to_body_mag ** 3)
+                indirect_term = r_body / (r_body_mag ** 3)
+                
+                acceleration = gm * (direct_term - indirect_term)
+                total_acceleration += acceleration
+        return total_acceleration
