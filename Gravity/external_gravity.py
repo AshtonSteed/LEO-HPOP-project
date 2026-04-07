@@ -70,7 +70,7 @@ class Bodies:
     def get_srp(self, position, t, timescale, area=1e-6, reflectivity=0.3, mass=1.0):
         time = timescale.tdb(jd=t/86400)
         
-        sun = self.planet_data['sun']
+        sun = self.planet_data['sun']['body']
         
         # Find distance to sun from earth and to sun from satellite
         r_body = (self.earth - sun).at(time).position.km

@@ -50,13 +50,16 @@ def state_update(t, statevec, g: Gravity,d: Drag, b: Bodies, ts: sf.Timescale, h
     a_d = d.drag_acceleration(r, v, t, high_fidelity=high_fidelity)
     a_b = b.get_ext_gravity(r, t, ts)
     
+    # SRP
+    a_s = b.get_srp(r, t, ts)
+    
 
     
 
     
     output[:3] = v
     # The last three elements of the output are the acceleration components (dv/dt = a)
-    output[3:] = a_g + a_b +a_d
+    output[3:] = a_g + a_b +a_d+a_s
     
     if not np.all(np.isfinite(output)):
             print(f"🚨 BAD VALUE DETECTED! 🚨")
