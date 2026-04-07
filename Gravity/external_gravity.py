@@ -65,3 +65,25 @@ class Bodies:
                 acceleration = gm * (direct_term - indirect_term)
                 total_acceleration += acceleration
         return total_acceleration
+
+    
+    def get_srp(self, position, t, timescale, area=1e-6, reflectivity=0.3, mass=1.0):
+        time = timescale.tdb(jd=t/86400)
+        
+        sun = self.planet_data['sun']
+        
+        # Find distance to sun from earth and to sun from satellite
+        r_body = (self.earth - sun).at(time).position.km
+        r_sat_to_body = r_body - position
+        
+        dist_to_sun = np.linalg.norm(r_sat_to_body)
+        
+        
+        # Calc Force
+        # Placeholder for Cannonball Solar Radiation Pressure acceleration 
+        s = 1367e6 # Solar Constant, W/km^2
+        c = 299792.458 # Speed of light, km/s
+        v = 1 #TODO: Add method to check visibility to sun
+        a = -v * s/c * reflectivity * area / mass * r_sat_to_body / dist_to_sun
+        
+        return a
